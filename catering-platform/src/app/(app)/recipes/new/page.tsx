@@ -3,10 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -89,76 +86,96 @@ export default function NewRecipePage() {
     <div>
       <PageHeader title="Create Recipe" backHref="/recipes" />
 
-      <Card className="mx-auto max-w-2xl">
-        <CardContent className="p-6">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="name">Recipe Name</Label>
-              <Input
-                id="name"
-                placeholder="e.g., Grilled Chicken Breast"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
+      <div className="max-w-2xl">
+        <form onSubmit={handleSubmit}>
+          <div className="bg-white rounded-2xl ambient-shadow overflow-hidden">
+            <div className="border-l-4 border-blue-700 p-8">
+              <div className="space-y-5">
+                {/* Recipe Name */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                    Recipe Name <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    placeholder="e.g., Grilled Chicken Breast"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="bg-gray-50 border-none h-12 rounded-lg"
+                  />
+                </div>
 
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger id="category">
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIES.map((cat) => (
-                      <SelectItem key={cat.value} value={cat.value}>
-                        {cat.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Category + Servings */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                      Category <span className="text-red-500">*</span>
+                    </label>
+                    <Select value={category} onValueChange={setCategory}>
+                      <SelectTrigger className="bg-gray-50 border-none h-12 rounded-lg">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CATEGORIES.map((cat) => (
+                          <SelectItem key={cat.value} value={cat.value}>
+                            {cat.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                      Servings <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      type="number"
+                      min="1"
+                      step="1"
+                      placeholder="e.g., 10"
+                      value={servings}
+                      onChange={(e) => setServings(e.target.value)}
+                      className="bg-gray-50 border-none h-12 rounded-lg"
+                    />
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                    Description
+                  </label>
+                  <Textarea
+                    placeholder="Brief description, prep notes, or special instructions..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={3}
+                    className="bg-gray-50 border-none rounded-lg resize-none"
+                  />
+                </div>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="servings">Servings</Label>
-                <Input
-                  id="servings"
-                  type="number"
-                  min="1"
-                  step="1"
-                  placeholder="e.g., 10"
-                  value={servings}
-                  onChange={(e) => setServings(e.target.value)}
-                />
-              </div>
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Description (optional)</Label>
-              <Textarea
-                id="description"
-                placeholder="Brief description, prep notes, or special instructions..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-              />
-            </div>
-
-            <div className="flex justify-end gap-3 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.push("/recipes")}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={saving}>
-                {saving ? "Saving..." : "Create Recipe"}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+          {/* Action buttons */}
+          <div className="flex justify-end gap-3 mt-6">
+            <button
+              type="button"
+              onClick={() => router.push("/recipes")}
+              className="h-11 px-5 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-100 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="h-11 px-6 bg-gradient-to-r from-blue-700 to-blue-900 text-white text-sm font-bold rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-150 disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Create Recipe"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

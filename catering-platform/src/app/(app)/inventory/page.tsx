@@ -1,20 +1,10 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import {
-  Package,
-  Search,
-  AlertTriangle,
-  Clock,
-} from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { LoadingScreen } from "@/components/layout/LoadingScreen";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -22,14 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +24,7 @@ import {
   type InventoryItem,
 } from "@/lib/hooks/useInventory";
 import { useToast } from "@/components/ui/use-toast";
+import { formatCurrency } from "@/lib/utils";
 
 const ADJUSTMENT_REASONS = [
   { value: "restock", label: "Restock" },
@@ -51,7 +34,7 @@ const ADJUSTMENT_REASONS = [
 ];
 
 function formatDate(date: Date | any): string {
-  if (!date) return "—";
+  if (!date) return "\u2014";
   const d = date instanceof Date ? date : date.toDate?.() ?? new Date(date);
   return d.toLocaleDateString("en-US", {
     month: "short",
@@ -100,15 +83,16 @@ export default function InventoryPage() {
   }, [inventory, search]);
 
   const summaryStats = useMemo(() => {
-    if (!inventory) return { total: 0, lowStock: 0, expiringSoon: 0 };
+    if (!inventory) return { total: 0, lowStock: 0, totalValue: 0 };
     return {
       total: inventory.length,
       lowStock: inventory.filter(
         (item) => item.currentQuantity < item.reorderPoint
       ).length,
-      expiringSoon: inventory.filter(
-        (item) => isExpiringSoon(item.expiryDate) || isExpired(item.expiryDate)
-      ).length,
+      totalValue: inventory.reduce(
+        (sum, item) => sum + (item.currentQuantity * (item.costPerUnit || 0)),
+        0
+      ),
     };
   }, [inventory]);
 
@@ -125,7 +109,6 @@ export default function InventoryPage() {
     setAdjusting(true);
 
     const qty = Number(adjustmentQty);
-    // For waste and use, quantity should be negative
     const finalQty =
       adjustmentReason === "waste" || adjustmentReason === "use"
         ? -Math.abs(qty)
@@ -161,183 +144,161 @@ export default function InventoryPage() {
     <div>
       <PageHeader
         title="Inventory"
-        description="Track ingredient stock levels and adjustments"
+        description="Track on-hand stock levels"
+        action={{
+          label: "Update Stock",
+          onClick: () => {
+            if (filtered.length > 0) openAdjustDialog(filtered[0]);
+          },
+          icon: "add",
+        }}
       />
-
-      {/* Summary Cards */}
-      {inventory && inventory.length > 0 && (
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Card>
-            <CardContent className="p-5">
-              <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-blue-50 p-2.5">
-                  <Package className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Items</p>
-                  <p className="text-2xl font-bold">{summaryStats.total}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-5">
-              <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-red-50 p-2.5">
-                  <AlertTriangle className="h-5 w-5 text-red-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Low Stock</p>
-                  <p className="text-2xl font-bold">{summaryStats.lowStock}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-5">
-              <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-amber-50 p-2.5">
-                  <Clock className="h-5 w-5 text-amber-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    Expiring Soon
-                  </p>
-                  <p className="text-2xl font-bold">
-                    {summaryStats.expiringSoon}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       {inventory && inventory.length > 0 ? (
         <>
-          <div className="mb-6">
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
+          {/* Stat Cards */}
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="bg-white rounded-2xl ambient-shadow p-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                  <span className="material-symbols-outlined text-blue-600 text-xl">inventory_2</span>
+                </div>
+                <div>
+                  <p className="text-xs uppercase font-bold text-gray-400 tracking-wider">Total Items</p>
+                  <p className="text-2xl font-extrabold text-gray-900">{summaryStats.total}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl ambient-shadow p-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center">
+                  <span className="material-symbols-outlined text-red-600 text-xl">warning</span>
+                </div>
+                <div>
+                  <p className="text-xs uppercase font-bold text-gray-400 tracking-wider">Low Stock Alerts</p>
+                  <p className="text-2xl font-extrabold text-gray-900">{summaryStats.lowStock}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl ambient-shadow p-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
+                  <span className="material-symbols-outlined text-green-600 text-xl">payments</span>
+                </div>
+                <div>
+                  <p className="text-xs uppercase font-bold text-gray-400 tracking-wider">Total Value</p>
+                  <p className="text-2xl font-extrabold text-gray-900">{formatCurrency(summaryStats.totalValue)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Search */}
+          <div className="mb-4">
+            <div className="relative max-w-sm">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg">search</span>
+              <input
                 placeholder="Search ingredients..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
               />
             </div>
           </div>
 
           {filtered.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
+            <div className="py-12 text-center text-gray-500 font-medium">
               No items match your search.
             </div>
           ) : (
-            <div className="rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ingredient</TableHead>
-                    <TableHead className="text-right">Qty On Hand</TableHead>
-                    <TableHead className="hidden sm:table-cell">Unit</TableHead>
-                    <TableHead className="hidden md:table-cell text-right">
-                      Reorder Point
-                    </TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="hidden lg:table-cell">
-                      Last Restocked
-                    </TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+            <div className="bg-white rounded-2xl ambient-shadow overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="text-left px-5 py-3 uppercase tracking-widest text-[10px] font-bold text-gray-400">Item</th>
+                    <th className="text-left px-5 py-3 uppercase tracking-widest text-[10px] font-bold text-gray-400 hidden sm:table-cell">Category</th>
+                    <th className="text-right px-5 py-3 uppercase tracking-widest text-[10px] font-bold text-gray-400">On Hand</th>
+                    <th className="text-left px-5 py-3 uppercase tracking-widest text-[10px] font-bold text-gray-400 hidden sm:table-cell">Unit</th>
+                    <th className="text-right px-5 py-3 uppercase tracking-widest text-[10px] font-bold text-gray-400 hidden md:table-cell">Reorder Point</th>
+                    <th className="text-left px-5 py-3 uppercase tracking-widest text-[10px] font-bold text-gray-400">Status</th>
+                    <th className="text-right px-5 py-3 uppercase tracking-widest text-[10px] font-bold text-gray-400">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {filtered.map((item) => {
                     const isLow = item.currentQuantity < item.reorderPoint;
+                    const outOfStock = item.currentQuantity <= 0;
                     const expiring = isExpiringSoon(item.expiryDate);
                     const expired = isExpired(item.expiryDate);
 
+                    let statusLabel = "In Stock";
+                    let statusStyle = "bg-green-100 text-green-700";
+                    if (outOfStock) {
+                      statusLabel = "Out of Stock";
+                      statusStyle = "bg-red-100 text-red-700";
+                    } else if (isLow) {
+                      statusLabel = "Low Stock";
+                      statusStyle = "bg-amber-100 text-amber-700";
+                    }
+
                     return (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">
-                              {item.ingredientName}
-                            </p>
-                            {item.location && (
-                              <p className="text-xs text-muted-foreground">
-                                {item.location}
-                              </p>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
+                      <tr key={item.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors">
+                        <td className="px-5 py-3.5">
+                          <p className="text-sm font-semibold text-gray-900">{item.ingredientName}</p>
+                          {item.location && (
+                            <p className="text-xs text-gray-400 mt-0.5">{item.location}</p>
+                          )}
+                        </td>
+                        <td className="px-5 py-3.5 text-sm text-gray-500 hidden sm:table-cell">
+                          {(item as any).category || "\u2014"}
+                        </td>
+                        <td className="px-5 py-3.5 text-right font-mono text-sm text-gray-900 font-semibold">
                           {item.currentQuantity}
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell text-muted-foreground">
+                        </td>
+                        <td className="px-5 py-3.5 text-sm text-gray-500 hidden sm:table-cell">
                           {item.unit}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell text-right text-muted-foreground">
+                        </td>
+                        <td className="px-5 py-3.5 text-right text-sm text-gray-500 hidden md:table-cell">
                           {item.reorderPoint}
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td className="px-5 py-3.5">
                           <div className="flex flex-col gap-1">
-                            {isLow ? (
-                              <Badge
-                                variant="secondary"
-                                className="bg-red-100 text-red-700 w-fit"
-                              >
-                                Low
-                              </Badge>
-                            ) : (
-                              <Badge
-                                variant="secondary"
-                                className="bg-green-100 text-green-700 w-fit"
-                              >
-                                OK
-                              </Badge>
-                            )}
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold w-fit ${statusStyle}`}>
+                              {statusLabel}
+                            </span>
                             {expired && (
-                              <Badge
-                                variant="secondary"
-                                className="bg-red-100 text-red-700 w-fit"
-                              >
+                              <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold bg-red-100 text-red-700 w-fit">
                                 Expired
-                              </Badge>
+                              </span>
                             )}
                             {expiring && !expired && (
-                              <Badge
-                                variant="secondary"
-                                className="bg-amber-100 text-amber-700 w-fit"
-                              >
+                              <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold bg-amber-100 text-amber-700 w-fit">
                                 Expiring
-                              </Badge>
+                              </span>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell text-muted-foreground">
-                          {formatDate(item.lastRestockedAt)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
+                        </td>
+                        <td className="px-5 py-3.5 text-right">
+                          <button
                             onClick={() => openAdjustDialog(item)}
+                            className="h-8 px-3 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
                           >
                             Adjust
-                          </Button>
-                        </TableCell>
-                      </TableRow>
+                          </button>
+                        </td>
+                      </tr>
                     );
                   })}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
           )}
         </>
       ) : (
         <EmptyState
-          icon={<Package className="h-12 w-12" />}
+          icon="inventory_2"
           title="No inventory items"
           description="Inventory items will appear here once ingredients are added and stock is tracked."
         />
@@ -345,45 +306,45 @@ export default function InventoryPage() {
 
       {/* Adjust Dialog */}
       <Dialog open={adjustDialogOpen} onOpenChange={setAdjustDialogOpen}>
-        <DialogContent>
+        <DialogContent className="rounded-2xl">
           <DialogHeader>
-            <DialogTitle>
-              Adjust Inventory — {selectedItem?.ingredientName}
+            <DialogTitle className="text-lg font-bold text-gray-900">
+              Adjust Inventory \u2014 {selectedItem?.ingredientName}
             </DialogTitle>
           </DialogHeader>
           {selectedItem && (
             <div className="space-y-4 pt-2">
-              <div className="rounded-lg bg-muted/50 p-3">
-                <p className="text-sm text-muted-foreground">
+              <div className="rounded-xl bg-gray-50 border border-gray-200 p-3">
+                <p className="text-sm text-gray-500">
                   Current quantity:{" "}
-                  <span className="font-semibold text-foreground">
+                  <span className="font-bold text-gray-900">
                     {selectedItem.currentQuantity} {selectedItem.unit}
                   </span>
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label>Adjustment Quantity</Label>
-                <Input
+                <Label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Adjustment Quantity</Label>
+                <input
                   type="number"
                   step="any"
-                  placeholder="Enter quantity (positive to add, negative to subtract)"
+                  placeholder="Enter quantity"
                   value={adjustmentQty}
                   onChange={(e) => setAdjustmentQty(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                 />
-                <p className="text-xs text-muted-foreground">
-                  For waste or use, enter a positive number. It will be
-                  automatically subtracted.
+                <p className="text-xs text-gray-400">
+                  For waste or use, enter a positive number. It will be automatically subtracted.
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label>Reason</Label>
+                <Label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Reason</Label>
                 <Select
                   value={adjustmentReason}
                   onValueChange={setAdjustmentReason}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-gray-50 rounded-lg border-gray-200">
                     <SelectValue placeholder="Select reason..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -397,27 +358,29 @@ export default function InventoryPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Notes (optional)</Label>
-                <Input
+                <Label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Notes (optional)</Label>
+                <input
                   placeholder="e.g. Damaged packaging, physical count correction"
                   value={adjustmentNotes}
                   onChange={(e) => setAdjustmentNotes(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                 />
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  variant="outline"
+                <button
                   onClick={() => setAdjustDialogOpen(false)}
+                  className="h-10 px-4 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
                 >
                   Cancel
-                </Button>
-                <Button
+                </button>
+                <button
                   onClick={handleAdjust}
                   disabled={!adjustmentQty || !adjustmentReason || adjusting}
+                  className="h-10 px-5 bg-gradient-to-r from-blue-700 to-blue-900 text-white text-sm font-bold rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {adjusting ? "Saving..." : "Save Adjustment"}
-                </Button>
+                </button>
               </div>
             </div>
           )}

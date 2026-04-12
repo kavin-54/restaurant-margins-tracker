@@ -2,25 +2,9 @@
 
 import React, { useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import {
-  Pencil,
-  Trash2,
-  Copy,
-  Plus,
-  X,
-  DollarSign,
-  TrendingUp,
-  Receipt,
-} from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LoadingScreen } from "@/components/layout/LoadingScreen";
 import { LoadingSpinner } from "@/components/layout/LoadingScreen";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -48,7 +32,7 @@ import {
   type EventStatus,
 } from "@/lib/hooks/useEvents";
 import { useClients } from "@/lib/hooks/useClients";
-import { useRecipes, type Recipe } from "@/lib/hooks/useRecipes";
+import { useRecipes } from "@/lib/hooks/useRecipes";
 
 const SERVICE_STYLES = [
   "Buffet",
@@ -60,23 +44,31 @@ const SERVICE_STYLES = [
 ];
 
 const STATUS_OPTIONS: { label: string; value: EventStatus }[] = [
-  { label: "Inquiry", value: "inquiry" },
-  { label: "Proposal", value: "proposal" },
+  { label: "In Progress", value: "inquiry" },
+  { label: "Proposed", value: "proposal" },
   { label: "Confirmed", value: "confirmed" },
   { label: "Completed", value: "completed" },
   { label: "Cancelled", value: "cancelled" },
 ];
 
-const STATUS_COLORS: Record<EventStatus, string> = {
-  inquiry: "bg-blue-100 text-blue-800",
-  proposal: "bg-yellow-100 text-yellow-800",
-  confirmed: "bg-green-100 text-green-800",
-  completed: "bg-gray-100 text-gray-800",
-  cancelled: "bg-red-100 text-red-800",
+const STATUS_BADGE: Record<EventStatus, string> = {
+  inquiry: "bg-blue-100 text-blue-700",
+  proposal: "bg-amber-50 text-amber-700",
+  confirmed: "bg-green-100 text-green-700",
+  completed: "bg-gray-100 text-gray-600",
+  cancelled: "bg-red-100 text-red-700",
+};
+
+const STATUS_LABEL: Record<EventStatus, string> = {
+  inquiry: "In Progress",
+  proposal: "Proposed",
+  confirmed: "Confirmed",
+  completed: "Completed",
+  cancelled: "Cancelled",
 };
 
 function formatDate(date: Date): string {
-  if (!(date instanceof Date) || isNaN(date.getTime())) return "—";
+  if (!(date instanceof Date) || isNaN(date.getTime())) return "\u2014";
   return date.toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -122,7 +114,6 @@ export default function EventDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
 
-  // Selected recipe for the add dialog
   const selectedRecipe = useMemo(() => {
     return recipes?.find((r) => r.id === addItemForm.recipeId) || null;
   }, [recipes, addItemForm.recipeId]);
@@ -136,10 +127,14 @@ export default function EventDetailPage() {
   if (!event) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px]">
-        <p className="text-muted-foreground">Event not found.</p>
-        <Button variant="outline" className="mt-4" onClick={() => router.push("/events")}>
+        <span className="material-symbols-outlined text-gray-300 text-5xl mb-3">error_outline</span>
+        <p className="text-gray-500 font-medium">Event not found.</p>
+        <button
+          onClick={() => router.push("/events")}
+          className="mt-4 h-10 px-5 border-2 border-blue-700 text-blue-700 text-sm font-bold rounded-xl hover:bg-blue-50 transition"
+        >
           Back to Events
-        </Button>
+        </button>
       </div>
     );
   }
@@ -182,7 +177,7 @@ export default function EventDetailPage() {
   async function handleStatusChange(newStatus: EventStatus) {
     try {
       await updateEventStatus(event!.id, newStatus);
-      toast({ title: "Status updated", description: `Event is now ${newStatus}.` });
+      toast({ title: "Status updated", description: `Event is now ${STATUS_LABEL[newStatus]}.` });
     } catch {
       toast({ title: "Error", description: "Failed to update status.", variant: "destructive" });
     }
@@ -205,7 +200,6 @@ export default function EventDetailPage() {
         notes: undefined,
       });
 
-      // Recalculate total cost
       const currentItems = menuItems || [];
       const newTotalCost = currentItems.reduce((sum, item) => sum + item.lineCost, 0) + lineCost;
       const margin = event!.totalPrice > 0
@@ -270,88 +264,104 @@ export default function EventDetailPage() {
       ? "text-green-600"
       : event.marginPercentage < 0
       ? "text-red-600"
-      : "text-muted-foreground";
+      : "text-gray-400";
 
   return (
     <div>
-      <PageHeader title={event.eventType} backHref="/events" />
+      {/* Header with status badge */}
+      <PageHeader title={event.eventType} backHref="/events">
+        <div className="flex items-center gap-3 mt-2">
+          <span
+            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${STATUS_BADGE[event.status]}`}
+          >
+            {STATUS_LABEL[event.status]}
+          </span>
+          <Select value={event.status} onValueChange={(v) => handleStatusChange(v as EventStatus)}>
+            <SelectTrigger className="w-[180px] bg-gray-50 border-none h-9 rounded-lg text-sm">
+              <SelectValue placeholder="Change status" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </PageHeader>
 
-      {/* Status row */}
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <Badge variant="secondary" className={`text-sm px-3 py-1 ${STATUS_COLORS[event.status]}`}>
-          {event.status.charAt(0).toUpperCase() + event.status.slice(1)}
-        </Badge>
-        <Select value={event.status} onValueChange={(v) => handleStatusChange(v as EventStatus)}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Change status" />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
+      {/* Info cards grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Event Info Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base">Event Details</CardTitle>
+        {/* Event Details Card */}
+        <div className="bg-white rounded-2xl ambient-shadow overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <h3 className="text-sm font-bold text-gray-900">Event Details</h3>
             {!editing ? (
-              <Button variant="ghost" size="sm" onClick={startEditing}>
-                <Pencil className="h-4 w-4 mr-1" />
+              <button
+                onClick={startEditing}
+                className="flex items-center gap-1.5 text-xs font-bold text-blue-700 hover:text-blue-800 transition"
+              >
+                <span className="material-symbols-outlined text-base">edit</span>
                 Edit
-              </Button>
+              </button>
             ) : (
               <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={() => { setEditing(false); setEditForm(null); }}>
+                <button
+                  onClick={() => { setEditing(false); setEditForm(null); }}
+                  className="text-xs font-bold text-gray-400 hover:text-gray-600 transition"
+                >
                   Cancel
-                </Button>
-                <Button size="sm" onClick={saveEdit} disabled={savingEdit}>
+                </button>
+                <button
+                  onClick={saveEdit}
+                  disabled={savingEdit}
+                  className="flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-800 transition disabled:opacity-50"
+                >
                   {savingEdit && <LoadingSpinner className="mr-1" />}
                   Save
-                </Button>
+                </button>
               </div>
             )}
-          </CardHeader>
-          <CardContent>
+          </div>
+          <div className="p-6">
             {!editing ? (
-              <dl className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Client</dt>
-                  <dd className="font-medium">{event.clientName}</dd>
+              <dl className="space-y-4 text-sm">
+                <div className="flex justify-between items-center">
+                  <dt className="text-gray-400 font-medium">Client</dt>
+                  <dd className="font-semibold text-gray-900">{event.clientName}</dd>
                 </div>
-                <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Date</dt>
-                  <dd className="font-medium">{formatDate(event.eventDate)}</dd>
+                <div className="flex justify-between items-center">
+                  <dt className="text-gray-400 font-medium">Date</dt>
+                  <dd className="font-semibold text-gray-900">{formatDate(event.eventDate)}</dd>
                 </div>
-                <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Service Style</dt>
-                  <dd className="font-medium">{event.eventType}</dd>
+                <div className="flex justify-between items-center">
+                  <dt className="text-gray-400 font-medium">Service Style</dt>
+                  <dd className="font-semibold text-gray-900">{event.eventType}</dd>
                 </div>
-                <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Guest Count</dt>
-                  <dd className="font-medium">{event.guestCount}</dd>
+                <div className="flex justify-between items-center">
+                  <dt className="text-gray-400 font-medium">Guest Count</dt>
+                  <dd className="font-semibold text-gray-900 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-base text-gray-400">group</span>
+                    {event.guestCount}
+                  </dd>
                 </div>
                 {event.notes && (
-                  <div className="pt-2 border-t">
-                    <dt className="text-muted-foreground mb-1">Notes</dt>
-                    <dd className="text-foreground whitespace-pre-wrap">{event.notes}</dd>
+                  <div className="pt-3 border-t border-gray-100">
+                    <dt className="text-gray-400 font-medium mb-1">Notes</dt>
+                    <dd className="text-gray-700 whitespace-pre-wrap leading-relaxed">{event.notes}</dd>
                   </div>
                 )}
               </dl>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label>Client</Label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Client</label>
                   <Select
                     value={editForm!.clientId}
                     onValueChange={(v) => setEditForm({ ...editForm!, clientId: v })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-gray-50 border-none h-12 rounded-lg focus:ring-2 focus:ring-blue-500/20">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -362,20 +372,21 @@ export default function EventDetailPage() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Date</Label>
-                  <Input
+                  <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Date</label>
+                  <input
                     type="date"
                     value={editForm!.eventDate}
                     onChange={(e) => setEditForm({ ...editForm!, eventDate: e.target.value })}
+                    className="w-full bg-gray-50 border-none h-12 rounded-lg px-4 text-sm focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Service Style</Label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Service Style</label>
                   <Select
                     value={editForm!.eventType}
                     onValueChange={(v) => setEditForm({ ...editForm!, eventType: v })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-gray-50 border-none h-12 rounded-lg focus:ring-2 focus:ring-blue-500/20">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -386,118 +397,132 @@ export default function EventDetailPage() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Guest Count</Label>
-                  <Input
+                  <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Guest Count</label>
+                  <input
                     type="number"
                     min="1"
                     value={editForm!.guestCount}
                     onChange={(e) => setEditForm({ ...editForm!, guestCount: e.target.value })}
+                    className="w-full bg-gray-50 border-none h-12 rounded-lg px-4 text-sm focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Notes</Label>
-                  <Textarea
+                  <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Notes</label>
+                  <textarea
                     rows={3}
                     value={editForm!.notes}
                     onChange={(e) => setEditForm({ ...editForm!, notes: e.target.value })}
+                    className="w-full bg-gray-50 border-none rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500/20 focus:outline-none resize-none"
                   />
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Financial Summary Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Financial Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-4">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                <div className="flex items-center justify-center h-10 w-10 rounded-full bg-blue-100">
-                  <Receipt className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Total Cost</p>
-                  <p className="text-lg font-semibold">{formatCurrency(event.totalCost)}</p>
-                </div>
+        <div className="bg-white rounded-2xl ambient-shadow overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h3 className="text-sm font-bold text-gray-900">Financial Summary</h3>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="flex items-center gap-4 p-4 rounded-xl bg-gray-50/80">
+              <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <span className="material-symbols-outlined text-blue-600 text-xl">receipt_long</span>
               </div>
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                <div className="flex items-center justify-center h-10 w-10 rounded-full bg-green-100">
-                  <DollarSign className="h-5 w-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Total Price</p>
-                  <p className="text-lg font-semibold">{formatCurrency(event.totalPrice)}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                <div className="flex items-center justify-center h-10 w-10 rounded-full bg-purple-100">
-                  <TrendingUp className="h-5 w-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Margin</p>
-                  <p className={`text-lg font-semibold ${marginColor}`}>
-                    {event.marginPercentage.toFixed(1)}%
-                  </p>
-                </div>
+              <div>
+                <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Total Cost</p>
+                <p className="text-xl font-extrabold text-gray-900">{formatCurrency(event.totalCost)}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex items-center gap-4 p-4 rounded-xl bg-gray-50/80">
+              <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <span className="material-symbols-outlined text-green-600 text-xl">attach_money</span>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Total Price</p>
+                <p className="text-xl font-extrabold text-gray-900">{formatCurrency(event.totalPrice)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 p-4 rounded-xl bg-gray-50/80">
+              <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <span className="material-symbols-outlined text-purple-600 text-xl">trending_up</span>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Margin</p>
+                <p className={`text-xl font-extrabold ${marginColor}`}>
+                  {event.marginPercentage.toFixed(1)}%
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Menu Items Section */}
-      <Card className="mb-6">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-base">Menu Items</CardTitle>
-          <Button size="sm" onClick={() => setShowAddItem(true)}>
-            <Plus className="h-4 w-4 mr-1" />
+      <div className="bg-white rounded-2xl ambient-shadow overflow-hidden mb-6">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h3 className="text-sm font-bold text-gray-900">Menu Items</h3>
+          <button
+            onClick={() => setShowAddItem(true)}
+            className="h-9 px-4 bg-gradient-to-r from-blue-700 to-blue-900 text-white text-xs font-bold rounded-lg shadow-sm hover:shadow-md active:scale-95 transition-all duration-150 flex items-center gap-1.5"
+          >
+            <span className="material-symbols-outlined text-base">add</span>
             Add Menu Item
-          </Button>
-        </CardHeader>
-        <CardContent>
+          </button>
+        </div>
+        <div className="p-6">
           {(!menuItems || menuItems.length === 0) ? (
-            <p className="text-sm text-muted-foreground text-center py-6">
-              No menu items yet. Add recipes to build the event menu.
-            </p>
+            <div className="flex flex-col items-center justify-center py-10">
+              <span className="material-symbols-outlined text-gray-300 text-4xl mb-2">restaurant_menu</span>
+              <p className="text-sm text-gray-400 font-medium">
+                No menu items yet. Add recipes to build the event menu.
+              </p>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="px-3 py-2 text-left font-medium text-muted-foreground">Recipe</th>
-                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">Qty</th>
-                    <th className="px-3 py-2 text-right font-medium text-muted-foreground hidden sm:table-cell">Cost/Serving</th>
-                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">Line Cost</th>
-                    <th className="px-3 py-2 text-left font-medium text-muted-foreground hidden md:table-cell">Notes</th>
-                    <th className="px-3 py-2 w-10"></th>
+                  <tr className="bg-gray-50/50">
+                    <th className="px-4 py-3 text-left text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                      Recipe
+                    </th>
+                    <th className="px-4 py-3 text-right text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                      Qty
+                    </th>
+                    <th className="px-4 py-3 text-right text-[10px] uppercase font-bold text-gray-400 tracking-widest hidden sm:table-cell">
+                      Cost/Serving
+                    </th>
+                    <th className="px-4 py-3 text-right text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                      Line Cost
+                    </th>
+                    <th className="px-4 py-3 text-left text-[10px] uppercase font-bold text-gray-400 tracking-widest hidden md:table-cell">
+                      Notes
+                    </th>
+                    <th className="px-4 py-3 w-10"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {menuItems.map((item) => (
-                    <tr key={item.id} className="border-b last:border-0">
-                      <td className="px-3 py-2 font-medium">{item.recipeName}</td>
-                      <td className="px-3 py-2 text-right">{item.quantity}</td>
-                      <td className="px-3 py-2 text-right hidden sm:table-cell">
+                    <tr key={item.id} className="border-t border-gray-100 hover:bg-gray-50 transition">
+                      <td className="px-4 py-3 font-semibold text-gray-900">{item.recipeName}</td>
+                      <td className="px-4 py-3 text-right text-gray-500">{item.quantity}</td>
+                      <td className="px-4 py-3 text-right text-gray-500 hidden sm:table-cell">
                         {formatCurrency(item.costPerServing)}
                       </td>
-                      <td className="px-3 py-2 text-right font-medium">
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900">
                         {formatCurrency(item.lineCost)}
                       </td>
-                      <td className="px-3 py-2 text-muted-foreground hidden md:table-cell">
-                        {item.notes || "—"}
+                      <td className="px-4 py-3 text-gray-400 hidden md:table-cell">
+                        {item.notes || "\u2014"}
                       </td>
-                      <td className="px-3 py-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive hover:text-destructive"
+                      <td className="px-4 py-3">
+                        <button
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-50 hover:text-red-600 transition"
                           onClick={() => handleRemoveMenuItem(item.id, item.lineCost)}
                         >
-                          <X className="h-4 w-4" />
-                        </Button>
+                          <span className="material-symbols-outlined text-base">close</span>
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -505,22 +530,30 @@ export default function EventDetailPage() {
               </table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Action Buttons */}
       <div className="flex flex-wrap gap-3">
-        <Button variant="outline" onClick={handleDuplicate} disabled={duplicating}>
-          {duplicating ? <LoadingSpinner className="mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
-          Duplicate Event
-        </Button>
-        <Button
-          variant="destructive"
-          onClick={() => setShowDeleteConfirm(true)}
+        <button
+          onClick={handleDuplicate}
+          disabled={duplicating}
+          className="h-11 px-5 border-2 border-blue-700 text-blue-700 text-sm font-bold rounded-xl hover:bg-blue-50 active:scale-95 transition-all duration-150 flex items-center gap-2 disabled:opacity-50"
         >
-          <Trash2 className="h-4 w-4 mr-2" />
+          {duplicating ? (
+            <LoadingSpinner className="mr-1" />
+          ) : (
+            <span className="material-symbols-outlined text-lg">content_copy</span>
+          )}
+          Duplicate Event
+        </button>
+        <button
+          onClick={() => setShowDeleteConfirm(true)}
+          className="h-11 px-5 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-700 active:scale-95 transition-all duration-150 flex items-center gap-2"
+        >
+          <span className="material-symbols-outlined text-lg">delete</span>
           Delete Event
-        </Button>
+        </button>
       </div>
 
       {/* Add Menu Item Dialog */}
@@ -531,12 +564,12 @@ export default function EventDetailPage() {
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <Label>Recipe</Label>
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Recipe</label>
               <Select
                 value={addItemForm.recipeId}
                 onValueChange={(v) => setAddItemForm({ ...addItemForm, recipeId: v })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-gray-50 border-none h-12 rounded-lg focus:ring-2 focus:ring-blue-500/20">
                   <SelectValue placeholder="Select a recipe" />
                 </SelectTrigger>
                 <SelectContent>
@@ -551,51 +584,57 @@ export default function EventDetailPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Quantity</Label>
-                <Input
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Quantity</label>
+                <input
                   type="number"
                   min="1"
                   placeholder="e.g. 50"
                   value={addItemForm.quantity}
                   onChange={(e) => setAddItemForm({ ...addItemForm, quantity: e.target.value })}
+                  className="w-full bg-gray-50 border-none h-12 rounded-lg px-4 text-sm focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Servings</Label>
-                <Input
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Servings</label>
+                <input
                   type="number"
                   min="1"
                   placeholder={selectedRecipe ? String(selectedRecipe.servings) : ""}
                   value={addItemForm.servings}
                   onChange={(e) => setAddItemForm({ ...addItemForm, servings: e.target.value })}
+                  className="w-full bg-gray-50 border-none h-12 rounded-lg px-4 text-sm focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
                 />
               </div>
             </div>
 
             {selectedRecipe && addItemForm.quantity && (
-              <div className="rounded-lg bg-muted p-3 text-sm space-y-1">
+              <div className="rounded-xl bg-gray-50 p-4 text-sm space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Cost per serving</span>
-                  <span className="font-medium">{formatCurrency(selectedRecipe.costPerServing)}</span>
+                  <span className="text-gray-400 font-medium">Cost per serving</span>
+                  <span className="font-semibold text-gray-900">{formatCurrency(selectedRecipe.costPerServing)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Estimated line cost</span>
-                  <span className="font-semibold">{formatCurrency(calculatedLineCost)}</span>
+                  <span className="text-gray-400 font-medium">Estimated line cost</span>
+                  <span className="font-extrabold text-gray-900">{formatCurrency(calculatedLineCost)}</span>
                 </div>
               </div>
             )}
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setShowAddItem(false)}>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setShowAddItem(false)}
+                className="h-11 px-5 border-2 border-blue-700 text-blue-700 text-sm font-bold rounded-xl hover:bg-blue-50 transition"
+              >
                 Cancel
-              </Button>
-              <Button
+              </button>
+              <button
                 onClick={handleAddMenuItem}
                 disabled={!addItemForm.recipeId || !addItemForm.quantity || addingItem}
+                className="h-11 px-5 bg-gradient-to-r from-blue-700 to-blue-900 text-white text-sm font-bold rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-150 flex items-center gap-2 disabled:opacity-50"
               >
-                {addingItem && <LoadingSpinner className="mr-2" />}
+                {addingItem && <LoadingSpinner className="mr-1" />}
                 Add Item
-              </Button>
+              </button>
             </div>
           </div>
         </DialogContent>
@@ -607,18 +646,25 @@ export default function EventDetailPage() {
           <DialogHeader>
             <DialogTitle>Delete Event</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground py-2">
+          <p className="text-sm text-gray-500 py-2 leading-relaxed">
             Are you sure you want to delete this event? This action cannot be undone. All menu items
             associated with this event will also be removed.
           </p>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              onClick={() => setShowDeleteConfirm(false)}
+              className="h-11 px-5 border-2 border-blue-700 text-blue-700 text-sm font-bold rounded-xl hover:bg-blue-50 transition"
+            >
               Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {deleting && <LoadingSpinner className="mr-2" />}
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="h-11 px-5 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-700 active:scale-95 transition-all duration-150 flex items-center gap-2 disabled:opacity-50"
+            >
+              {deleting && <LoadingSpinner className="mr-1" />}
               {deleting ? "Deleting..." : "Delete Event"}
-            </Button>
+            </button>
           </div>
         </DialogContent>
       </Dialog>

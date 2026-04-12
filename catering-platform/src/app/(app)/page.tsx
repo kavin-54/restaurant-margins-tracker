@@ -2,21 +2,8 @@
 
 import React, { useMemo } from "react";
 import Link from "next/link";
-import {
-  CalendarDays,
-  DollarSign,
-  TrendingUp,
-  Trash2,
-  Plus,
-  BookOpen,
-  BarChart3,
-  AlertCircle,
-  Loader2,
-} from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { useEvents, type Event, type EventStatus } from "@/lib/hooks/useEvents";
-import { useWasteLog, type WasteEntry } from "@/lib/hooks/useWaste";
+import { useEvents, type EventStatus } from "@/lib/hooks/useEvents";
+import { useWasteLog } from "@/lib/hooks/useWaste";
 import { formatCurrency } from "@/lib/utils";
 
 // --- Helpers ---
@@ -39,73 +26,107 @@ function endOfWeek(date: Date): Date {
   return d;
 }
 
-const STATUS_COLORS: Record<EventStatus, string> = {
-  inquiry: "bg-blue-100 text-blue-800",
-  proposal: "bg-yellow-100 text-yellow-800",
-  confirmed: "bg-green-100 text-green-800",
-  completed: "bg-gray-100 text-gray-800",
-  cancelled: "bg-red-100 text-red-800",
+const STATUS_MAP: Record<string, { label: string; className: string }> = {
+  confirmed: { label: "Confirmed", className: "bg-green-100 text-green-700" },
+  proposal: { label: "Proposed", className: "bg-amber-50 text-amber-700" },
+  inquiry: { label: "In Planning", className: "bg-blue-100 text-blue-700" },
+  completed: { label: "Completed", className: "bg-gray-100 text-gray-700" },
+  cancelled: { label: "Cancelled", className: "bg-red-100 text-red-700" },
 };
 
-function formatDate(date: Date): string {
-  return new Date(date).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
+const AMBIENT_SHADOW = "0px 10px 40px rgba(45,51,53,0.06)";
 
 // --- Components ---
 
 function MetricCard({
-  title,
+  label,
   value,
-  icon: Icon,
-  subtitle,
+  icon,
+  iconBg,
+  iconColor,
+  change,
+  changePositive,
 }: {
-  title: string;
+  label: string;
   value: string;
-  icon: React.ElementType;
-  subtitle?: string;
+  icon: string;
+  iconBg: string;
+  iconColor: string;
+  change?: string;
+  changePositive?: boolean;
 }) {
   return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-500">{title}</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">{value}</p>
-            {subtitle && (
-              <p className="mt-1 text-xs text-gray-400">{subtitle}</p>
-            )}
-          </div>
-          <div className="rounded-lg bg-blue-50 p-3">
-            <Icon className="h-6 w-6 text-blue-600" />
-          </div>
+    <div
+      className="rounded-2xl bg-white p-6"
+      style={{ boxShadow: AMBIENT_SHADOW }}
+    >
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-gray-400">
+            {label}
+          </p>
+          <p className="mt-2 text-3xl font-extrabold text-gray-900">{value}</p>
+          {change && (
+            <div className="mt-2 flex items-center gap-1">
+              <span
+                className={`material-symbols-outlined text-sm ${
+                  changePositive ? "text-green-600" : "text-red-500"
+                }`}
+              >
+                {changePositive ? "arrow_upward" : "arrow_downward"}
+              </span>
+              <span
+                className={`text-xs font-semibold ${
+                  changePositive ? "text-green-600" : "text-red-500"
+                }`}
+              >
+                {change}
+              </span>
+            </div>
+          )}
         </div>
-      </CardContent>
-    </Card>
+        <div
+          className={`flex h-12 w-12 items-center justify-center rounded-xl ${iconBg}`}
+        >
+          <span className={`material-symbols-outlined text-xl ${iconColor}`}>
+            {icon}
+          </span>
+        </div>
+      </div>
+    </div>
   );
 }
 
-function QuickActionButton({
+function QuickActionCard({
   href,
-  icon: Icon,
-  label,
+  icon,
+  iconBg,
+  iconColor,
+  title,
+  subtitle,
 }: {
   href: string;
-  icon: React.ElementType;
-  label: string;
+  icon: string;
+  iconBg: string;
+  iconColor: string;
+  title: string;
+  subtitle: string;
 }) {
   return (
     <Link
       href={href}
-      className="flex flex-col items-center gap-3 rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:border-blue-300 hover:shadow-md"
+      className="group rounded-xl bg-white p-5 transition-all duration-150 hover:scale-[1.02] hover:shadow-md"
+      style={{ boxShadow: AMBIENT_SHADOW }}
     >
-      <div className="rounded-lg bg-blue-50 p-3">
-        <Icon className="h-6 w-6 text-blue-600" />
+      <div
+        className={`mb-3 flex h-10 w-10 items-center justify-center rounded-lg ${iconBg}`}
+      >
+        <span className={`material-symbols-outlined text-lg ${iconColor}`}>
+          {icon}
+        </span>
       </div>
-      <span className="text-sm font-medium text-gray-700">{label}</span>
+      <p className="text-sm font-bold text-gray-900">{title}</p>
+      <p className="mt-0.5 text-xs text-gray-400">{subtitle}</p>
     </Link>
   );
 }
@@ -128,15 +149,23 @@ export default function DashboardPage() {
     const allEvents = events ?? [];
     const allWaste = wasteEntries ?? [];
 
-    const thisWeekEvents = allEvents.filter((e) => {
-      const d = new Date(e.eventDate);
-      return d >= weekStart && d < weekEnd;
-    });
+    const activeEvents = allEvents.filter(
+      (e) =>
+        e.status !== "cancelled" &&
+        e.status !== "completed"
+    );
 
     const thisMonthEvents = allEvents.filter((e) => {
       const d = new Date(e.eventDate);
       return d >= monthStart && d <= now;
     });
+
+    const weekRevenue = allEvents
+      .filter((e) => {
+        const d = new Date(e.eventDate);
+        return d >= weekStart && d < weekEnd;
+      })
+      .reduce((sum, e) => sum + (e.totalPrice || 0), 0);
 
     const totalRevenue = thisMonthEvents.reduce(
       (sum, e) => sum + (e.totalPrice || 0),
@@ -146,8 +175,14 @@ export default function DashboardPage() {
       (sum, e) => sum + (e.totalCost || 0),
       0
     );
-    const foodCostPct =
-      totalRevenue > 0 ? (totalCost / totalRevenue) * 100 : 0;
+    const avgMargin =
+      totalRevenue > 0
+        ? ((totalRevenue - totalCost) / totalRevenue) * 100
+        : 0;
+
+    const pendingOrders = allEvents.filter(
+      (e) => e.status === "inquiry" || e.status === "proposal"
+    ).length;
 
     const wasteCost = allWaste
       .filter((w) => {
@@ -157,9 +192,10 @@ export default function DashboardPage() {
       .reduce((sum, w) => sum + (w.totalCost || 0), 0);
 
     return {
-      thisWeekCount: thisWeekEvents.length,
-      totalRevenue,
-      foodCostPct,
+      activeEvents: activeEvents.length,
+      weekRevenue,
+      avgMargin,
+      pendingOrders,
       wasteCost,
     };
   }, [events, wasteEntries, weekStart, weekEnd, monthStart, now]);
@@ -181,7 +217,7 @@ export default function DashboardPage() {
       .slice(0, 5);
   }, [events, now]);
 
-  // Events needing reconciliation (completed but 0 margin or cost data missing)
+  // Events needing reconciliation
   const needsAttention = useMemo(() => {
     if (!events) return [];
     return events.filter(
@@ -194,167 +230,206 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        <span className="material-symbols-outlined animate-spin text-3xl text-blue-600">
+          progress_activity
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page heading */}
+    <div className="space-y-8">
+      {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-500">
-          Overview of your catering operations
+        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">
+          Welcome Back, Chef
+        </h1>
+        <p className="mt-1 font-medium text-gray-500">
+          Here&apos;s what&apos;s cooking today
         </p>
       </div>
 
-      {/* Summary metric cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Metric Cards */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
-          title="This Week's Events"
-          value={String(metrics.thisWeekCount)}
-          icon={CalendarDays}
-          subtitle="Upcoming this week"
+          label="Active Events"
+          value={String(metrics.activeEvents)}
+          icon="event"
+          iconBg="bg-blue-100"
+          iconColor="text-blue-600"
+          change="vs last week"
         />
         <MetricCard
-          title="Total Revenue"
-          value={formatCurrency(metrics.totalRevenue)}
-          icon={DollarSign}
-          subtitle="This month"
+          label="Week Revenue"
+          value={formatCurrency(metrics.weekRevenue)}
+          icon="payments"
+          iconBg="bg-green-100"
+          iconColor="text-green-600"
+          changePositive={true}
+          change="this week"
         />
         <MetricCard
-          title="Food Cost %"
-          value={`${metrics.foodCostPct.toFixed(1)}%`}
-          icon={TrendingUp}
-          subtitle="This month"
+          label="Avg Margin"
+          value={`${metrics.avgMargin.toFixed(1)}%`}
+          icon="trending_up"
+          iconBg="bg-purple-100"
+          iconColor="text-purple-600"
+          changePositive={metrics.avgMargin >= 30}
+          change="this month"
         />
         <MetricCard
-          title="Waste Cost"
-          value={formatCurrency(metrics.wasteCost)}
-          icon={Trash2}
-          subtitle="This week"
+          label="Pending Orders"
+          value={String(metrics.pendingOrders)}
+          icon="inventory_2"
+          iconBg="bg-amber-100"
+          iconColor="text-amber-600"
         />
       </div>
 
-      {/* Two-column section */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      {/* Two-column: Upcoming Events + Quick Actions */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Upcoming Events */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-semibold">
-              Upcoming Events
-            </CardTitle>
+        <div
+          className="lg:col-span-2 rounded-2xl bg-white"
+          style={{ boxShadow: AMBIENT_SHADOW }}
+        >
+          <div className="flex items-center justify-between px-6 pt-6 pb-4">
+            <h2 className="text-lg font-bold text-gray-900">Upcoming Events</h2>
             <Link
               href="/events"
-              className="text-sm font-medium text-blue-600 hover:text-blue-800"
+              className="text-sm font-semibold text-blue-700 hover:text-blue-900 transition-colors"
             >
-              View all
+              View All
             </Link>
-          </CardHeader>
-          <CardContent>
-            {upcomingEvents.length === 0 ? (
+          </div>
+
+          {upcomingEvents.length === 0 ? (
+            <div className="px-6 pb-6">
               <p className="py-8 text-center text-sm text-gray-400">
                 No upcoming events
               </p>
-            ) : (
-              <div className="space-y-3">
-                {upcomingEvents.map((event) => (
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {upcomingEvents.map((event) => {
+                const d = new Date(event.eventDate);
+                const month = d
+                  .toLocaleDateString("en-US", { month: "short" })
+                  .toUpperCase();
+                const day = d.getDate();
+                const status = STATUS_MAP[event.status] ?? {
+                  label: event.status,
+                  className: "bg-gray-100 text-gray-700",
+                };
+
+                return (
                   <Link
                     key={event.id}
                     href={`/events/${event.id}`}
-                    className="flex items-center justify-between rounded-lg border border-gray-100 p-3 transition-colors hover:bg-gray-50"
+                    className="flex items-center gap-4 px-6 py-4 transition-colors hover:bg-gray-50"
                   >
+                    {/* Date box */}
+                    <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-lg bg-gray-50 p-3">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                        {month}
+                      </span>
+                      <span className="text-xl font-extrabold leading-none text-gray-900">
+                        {day}
+                      </span>
+                    </div>
+
+                    {/* Event info */}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-gray-900">
+                      <p className="truncate font-bold text-gray-900">
+                        {event.eventType || "Event"}
+                      </p>
+                      <p className="truncate text-sm text-gray-500">
                         {event.clientName}
                       </p>
-                      <p className="text-xs text-gray-500">
-                        {formatDate(event.eventDate)} &middot;{" "}
-                        {event.guestCount} guests
-                      </p>
                     </div>
-                    <Badge
-                      className={`ml-3 shrink-0 ${STATUS_COLORS[event.status]}`}
-                      variant="secondary"
+
+                    {/* Guest count */}
+                    <div className="hidden items-center gap-1 text-sm text-gray-500 sm:flex">
+                      <span className="material-symbols-outlined text-base text-gray-400">
+                        group
+                      </span>
+                      {event.guestCount}
+                    </div>
+
+                    {/* Status badge */}
+                    <span
+                      className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold uppercase ${status.className}`}
                     >
-                      {event.status}
-                    </Badge>
+                      {status.label}
+                    </span>
                   </Link>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Quick Actions */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-semibold">
-              Quick Actions
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <QuickActionButton
-                href="/events/new"
-                icon={Plus}
-                label="New Event"
-              />
-              <QuickActionButton
-                href="/recipes/new"
-                icon={BookOpen}
-                label="New Recipe"
-              />
-              <QuickActionButton
-                href="/waste/log"
-                icon={Trash2}
-                label="Log Waste"
-              />
-              <QuickActionButton
-                href="/reports"
-                icon={BarChart3}
-                label="View Reports"
-              />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <h2 className="text-lg font-bold text-gray-900 px-1">Quick Actions</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <QuickActionCard
+              href="/recipes/new"
+              icon="menu_book"
+              iconBg="bg-blue-100"
+              iconColor="text-blue-600"
+              title="New Recipe"
+              subtitle="Create a dish"
+            />
+            <QuickActionCard
+              href="/waste/log"
+              icon="delete_sweep"
+              iconBg="bg-red-100"
+              iconColor="text-red-500"
+              title="Log Waste"
+              subtitle="Record waste"
+            />
+            <QuickActionCard
+              href="/vendors/new"
+              icon="local_shipping"
+              iconBg="bg-purple-100"
+              iconColor="text-purple-600"
+              title="Add Vendor"
+              subtitle="New supplier"
+            />
+            <QuickActionCard
+              href="/inventory"
+              icon="inventory_2"
+              iconBg="bg-green-100"
+              iconColor="text-green-600"
+              title="Stock Check"
+              subtitle="Review inventory"
+            />
+          </div>
+        </div>
       </div>
 
-      {/* Needs Attention */}
+      {/* Alert Banner */}
       {needsAttention.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-              <AlertCircle className="h-5 w-5 text-amber-500" />
-              Needs Attention
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {needsAttention.map((event) => (
-                <Link
-                  key={event.id}
-                  href={`/events/${event.id}`}
-                  className="flex items-center justify-between rounded-lg border border-amber-100 bg-amber-50/50 p-3 transition-colors hover:bg-amber-50"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-gray-900">
-                      {event.clientName}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {formatDate(event.eventDate)} &middot;{" "}
-                      {event.guestCount} guests
-                    </p>
-                  </div>
-                  <span className="ml-3 shrink-0 text-xs font-medium text-amber-600">
-                    Needs reconciliation
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <span className="material-symbols-outlined mt-0.5 text-xl text-amber-600">
+            warning
+          </span>
+          <div>
+            <p className="font-bold text-amber-900">
+              {needsAttention.length} event{needsAttention.length !== 1 ? "s" : ""} need reconciliation
+            </p>
+            <p className="mt-0.5 text-sm text-amber-700">
+              Completed events with missing cost or revenue data require attention.{" "}
+              <Link
+                href={`/events/${needsAttention[0]?.id}`}
+                className="font-semibold underline hover:text-amber-900"
+              >
+                Review now
+              </Link>
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );

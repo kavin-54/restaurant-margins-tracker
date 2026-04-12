@@ -17,6 +17,7 @@ export interface InventoryItem {
   reorderPoint: number;
   lastRestockedAt: Date;
   expiryDate?: Date;
+  costPerUnit?: number;
   location?: string;
   notes?: string;
   updatedAt: Date;

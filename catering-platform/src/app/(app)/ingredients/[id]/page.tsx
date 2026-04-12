@@ -2,14 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Trash2, Pencil, X, Check, Plus } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LoadingScreen } from "@/components/layout/LoadingScreen";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -18,20 +14,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import {
   useIngredient,
@@ -43,7 +32,7 @@ import {
 import { formatCurrency } from "@/lib/utils";
 
 const CATEGORIES = [
-  { value: "protein", label: "Protein" },
+  { value: "protein", label: "Meat / Protein" },
   { value: "produce", label: "Produce" },
   { value: "dairy", label: "Dairy" },
   { value: "dry-goods", label: "Dry Goods" },
@@ -61,8 +50,25 @@ function getCategoryLabel(value: string): string {
   return CATEGORIES.find((c) => c.value === value)?.label ?? value;
 }
 
+function getCategoryBadgeClasses(category: string): string {
+  switch (category) {
+    case "produce":
+      return "bg-green-100 text-green-700";
+    case "dairy":
+      return "bg-blue-100 text-blue-700";
+    case "dry-goods":
+      return "bg-purple-100 text-purple-700";
+    case "protein":
+      return "bg-red-100 text-red-700";
+    case "spice":
+      return "bg-amber-100 text-amber-700";
+    default:
+      return "bg-gray-100 text-gray-600";
+  }
+}
+
 function formatDate(date: Date | { toDate?: () => Date } | string): string {
-  if (!date) return "—";
+  if (!date) return "\u2014";
   const d =
     typeof date === "string"
       ? new Date(date)
@@ -121,7 +127,7 @@ export default function IngredientDetailPage() {
   if (loading) return <LoadingScreen />;
   if (error || !ingredient) {
     return (
-      <div className="p-6 text-destructive">
+      <div className="p-6 text-red-600">
         Ingredient not found or failed to load.
       </div>
     );
@@ -222,73 +228,69 @@ export default function IngredientDetailPage() {
     }
   }
 
+  // Simulated inventory values (no inventory field on current data model)
+  const quantityOnHand = 0;
+  const reorderPoint = 0;
+  const inventoryPercent = reorderPoint > 0 ? Math.min(100, (quantityOnHand / reorderPoint) * 100) : 0;
+
   return (
-    <div className="p-6">
+    <div>
       <PageHeader title={ingredient.name} backHref="/ingredients" />
 
-      <div className="space-y-6 max-w-4xl">
-        {/* Ingredient Details Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <CardTitle>Ingredient Details</CardTitle>
-            <div className="flex gap-2">
-              {editing ? (
-                <>
-                  <Button size="sm" onClick={handleSave} disabled={saving}>
-                    <Check className="h-4 w-4 mr-1" />
-                    {saving ? "Saving..." : "Save"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setEditing(false)}
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Cancel
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button size="sm" variant="outline" onClick={startEditing}>
-                    <Pencil className="h-4 w-4 mr-1" />
-                    Edit
-                  </Button>
-                  <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm" variant="destructive">
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Delete Ingredient</DialogTitle>
-                      </DialogHeader>
-                      <p className="text-sm text-muted-foreground">
-                        Are you sure you want to delete{" "}
-                        <span className="font-semibold text-foreground">
-                          {ingredient.name}
-                        </span>
-                        ? This action cannot be undone.
-                      </p>
-                      <div className="flex justify-end gap-3 mt-4">
-                        <Button
-                          variant="outline"
-                          onClick={() => setDeleteOpen(false)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button variant="destructive" onClick={handleDelete}>
-                          Delete
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </>
-              )}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Image + Inventory */}
+        <div className="space-y-6">
+          {/* Image Placeholder */}
+          <div className="bg-white rounded-2xl ambient-shadow overflow-hidden">
+            <div className="w-full aspect-square bg-gray-100 flex items-center justify-center">
+              <span className="material-symbols-outlined text-gray-300 text-6xl">
+                image
+              </span>
             </div>
-          </CardHeader>
-          <CardContent>
+          </div>
+
+          {/* Inventory Summary */}
+          <div className="bg-white rounded-2xl ambient-shadow p-6">
+            <h3 className="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-4">
+              Inventory Summary
+            </h3>
+            <div className="space-y-3">
+              <div className="w-full bg-gray-100 rounded-full h-2">
+                <div
+                  className="bg-blue-600 h-2 rounded-full transition-all"
+                  style={{ width: `${inventoryPercent}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-sm">
+                <div>
+                  <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                    On Hand
+                  </p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {quantityOnHand} {ingredient.unit}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                    Reorder Point
+                  </p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {reorderPoint} {ingredient.unit}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Specs + Vendor Table */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Specifications Card */}
+          <div className="bg-white rounded-2xl ambient-shadow p-6">
+            <h3 className="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-5">
+              Specifications
+            </h3>
+
             {editing ? (
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -343,185 +345,289 @@ export default function IngredientDetailPage() {
                     onChange={(e) => setEditSupplier(e.target.value)}
                   />
                 </div>
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="h-10 px-5 bg-gradient-to-r from-blue-700 to-blue-900 text-white text-sm font-bold rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-150 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-lg">check</span>
+                    {saving ? "Saving..." : "Save"}
+                  </button>
+                  <button
+                    onClick={() => setEditing(false)}
+                    className="h-10 px-5 bg-gray-100 text-gray-600 text-sm font-bold rounded-xl hover:bg-gray-200 transition-all duration-150 flex items-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-lg">close</span>
+                    Cancel
+                  </button>
+                </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8">
-                <div>
-                  <p className="text-sm text-muted-foreground">Category</p>
-                  <Badge variant="secondary" className="mt-1">
-                    {getCategoryLabel(ingredient.category)}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Unit</p>
-                  <p className="font-medium">{ingredient.unit}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Cost per Unit</p>
-                  <p className="font-medium">
-                    {formatCurrency(ingredient.costPerUnit)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Supplier</p>
-                  <p className="font-medium">{ingredient.supplier || "—"}</p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Vendor Records Section */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <CardTitle>Vendor Records</CardTitle>
-            <Dialog open={vendorDialogOpen} onOpenChange={setVendorDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="gap-1">
-                  <Plus className="h-4 w-4" />
-                  Add Record
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add Vendor Record</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleAddVendorRecord} className="space-y-4 mt-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="vr-vendor">Vendor Name</Label>
-                    <Input
-                      id="vr-vendor"
-                      placeholder="e.g. Sysco"
-                      value={vrVendorName}
-                      onChange={(e) => setVrVendorName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="vr-price">Price per Unit ($)</Label>
-                      <Input
-                        id="vr-price"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        value={vrPricePerUnit}
-                        onChange={(e) => setVrPricePerUnit(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="vr-qty">Quantity</Label>
-                      <Input
-                        id="vr-qty"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0"
-                        value={vrQuantity}
-                        onChange={(e) => setVrQuantity(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="vr-unit">Unit</Label>
-                      <Input
-                        id="vr-unit"
-                        placeholder={ingredient.unit}
-                        value={vrUnit}
-                        onChange={(e) => setVrUnit(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="vr-total">Total Cost ($)</Label>
-                      <Input
-                        id="vr-total"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        value={vrTotalCost}
-                        onChange={(e) => setVrTotalCost(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="vr-date">Purchase Date</Label>
-                    <Input
-                      id="vr-date"
-                      type="date"
-                      value={vrPurchaseDate}
-                      onChange={(e) => setVrPurchaseDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex justify-end gap-3 pt-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setVendorDialogOpen(false)}
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">
+                      Category
+                    </p>
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${getCategoryBadgeClasses(ingredient.category)}`}
                     >
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={vrSaving}>
-                      {vrSaving ? "Saving..." : "Add Record"}
-                    </Button>
+                      {getCategoryLabel(ingredient.category)}
+                    </span>
                   </div>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </CardHeader>
-          <CardContent>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">
+                      Unit
+                    </p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {ingredient.unit}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">
+                      Cost/Unit
+                    </p>
+                    <p className="text-sm font-semibold text-blue-700">
+                      {formatCurrency(ingredient.costPerUnit)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">
+                      SKU
+                    </p>
+                    <p className="text-sm font-semibold text-gray-900 font-mono">
+                      {id.slice(0, 8).toUpperCase()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">
+                      Allergens
+                    </p>
+                    <p className="text-sm font-semibold text-gray-400">
+                      None
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">
+                      Tags
+                    </p>
+                    {ingredient.supplier ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100/20 text-purple-700">
+                        {ingredient.supplier}
+                      </span>
+                    ) : (
+                      <p className="text-sm font-semibold text-gray-400">
+                        None
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Edit / Delete Buttons */}
+                <div className="flex items-center gap-3 mt-6 pt-5 border-t border-gray-100">
+                  <button
+                    onClick={startEditing}
+                    className="h-10 px-5 bg-gray-100 text-gray-700 text-sm font-bold rounded-xl hover:bg-gray-200 transition-all duration-150 flex items-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-lg">edit</span>
+                    Edit
+                  </button>
+                  <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+                    <DialogTrigger asChild>
+                      <button className="h-10 px-5 bg-red-50 text-red-600 text-sm font-bold rounded-xl hover:bg-red-100 transition-all duration-150 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-lg">delete</span>
+                        Delete
+                      </button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Delete Ingredient</DialogTitle>
+                      </DialogHeader>
+                      <p className="text-sm text-gray-500">
+                        Are you sure you want to delete{" "}
+                        <span className="font-semibold text-gray-900">
+                          {ingredient.name}
+                        </span>
+                        ? This action cannot be undone.
+                      </p>
+                      <div className="flex justify-end gap-3 mt-4">
+                        <Button
+                          variant="outline"
+                          onClick={() => setDeleteOpen(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={handleDelete}>
+                          Delete
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Vendor Records Table */}
+          <div className="bg-white rounded-2xl ambient-shadow overflow-hidden">
+            <div className="flex items-center justify-between p-6 pb-4">
+              <h3 className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                Vendor Records
+              </h3>
+              <Dialog open={vendorDialogOpen} onOpenChange={setVendorDialogOpen}>
+                <DialogTrigger asChild>
+                  <button className="h-9 px-4 bg-gradient-to-r from-blue-700 to-blue-900 text-white text-xs font-bold rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-150 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-base">add</span>
+                    Add Record
+                  </button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Vendor Record</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleAddVendorRecord} className="space-y-4 mt-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="vr-vendor">Vendor Name</Label>
+                      <Input
+                        id="vr-vendor"
+                        placeholder="e.g. Sysco"
+                        value={vrVendorName}
+                        onChange={(e) => setVrVendorName(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="vr-price">Price per Unit ($)</Label>
+                        <Input
+                          id="vr-price"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          value={vrPricePerUnit}
+                          onChange={(e) => setVrPricePerUnit(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="vr-qty">Quantity</Label>
+                        <Input
+                          id="vr-qty"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0"
+                          value={vrQuantity}
+                          onChange={(e) => setVrQuantity(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="vr-unit">Unit</Label>
+                        <Input
+                          id="vr-unit"
+                          placeholder={ingredient.unit}
+                          value={vrUnit}
+                          onChange={(e) => setVrUnit(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="vr-total">Total Cost ($)</Label>
+                        <Input
+                          id="vr-total"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          value={vrTotalCost}
+                          onChange={(e) => setVrTotalCost(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="vr-date">Purchase Date</Label>
+                      <Input
+                        id="vr-date"
+                        type="date"
+                        value={vrPurchaseDate}
+                        onChange={(e) => setVrPurchaseDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setVendorDialogOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={vrSaving}>
+                        {vrSaving ? "Saving..." : "Add Record"}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+
             {vendorLoading ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-8 text-gray-400 font-medium">
                 Loading vendor records...
               </div>
             ) : vendorRecords && vendorRecords.length > 0 ? (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Vendor</TableHead>
-                      <TableHead className="text-right">Price/Unit</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
-                      <TableHead>Unit</TableHead>
-                      <TableHead className="text-right">Total Cost</TableHead>
-                      <TableHead>Date</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {vendorRecords.map((vr) => (
-                      <TableRow key={vr.id}>
-                        <TableCell className="font-medium">
-                          {vr.vendorName}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(vr.pricePerUnit)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {vr.quantity}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {vr.unit}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(vr.totalCost)}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {formatDate(vr.purchaseDate)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50/50">
+                    <th className="text-left px-6 py-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                      Vendor
+                    </th>
+                    <th className="text-left px-6 py-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                      Price
+                    </th>
+                    <th className="text-left px-6 py-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                      Quantity
+                    </th>
+                    <th className="text-left px-6 py-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                      Date
+                    </th>
+                    <th className="text-left px-6 py-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {vendorRecords.map((vr) => (
+                    <tr key={vr.id} className="hover:bg-gray-50 transition">
+                      <td className="px-6 py-4 text-sm font-semibold text-gray-900">
+                        {vr.vendorName}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-blue-700 font-bold">
+                        {formatCurrency(vr.pricePerUnit)}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {vr.quantity} {vr.unit}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {formatDate(vr.purchaseDate)}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                          Delivered
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-12 text-gray-400 font-medium px-6 pb-6">
                 No vendor records yet. Add one to track purchase history.
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

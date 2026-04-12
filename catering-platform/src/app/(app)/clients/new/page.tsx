@@ -3,10 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { addClient } from "@/lib/hooks/useClients";
@@ -73,128 +70,154 @@ export default function NewClientPage() {
   }
 
   return (
-    <div className="p-6">
+    <div>
       <PageHeader title="Add Client" backHref="/clients" />
 
-      <Card className="max-w-2xl">
-        <CardContent className="pt-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">
-                  Name <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="name"
-                  placeholder="Full name"
-                  value={form.name}
-                  onChange={(e) => updateField("name", e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="company">Company</Label>
-                <Input
-                  id="company"
-                  placeholder="Company name"
-                  value={form.company}
-                  onChange={(e) => updateField("company", e.target.value)}
-                />
-              </div>
-            </div>
+      <div className="max-w-2xl">
+        <form onSubmit={handleSubmit}>
+          <div className="bg-white rounded-2xl ambient-shadow overflow-hidden">
+            <div className="border-l-4 border-blue-700 p-8">
+              <div className="space-y-5">
+                {/* Name + Company */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                      Name <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      placeholder="Full name"
+                      value={form.name}
+                      onChange={(e) => updateField("name", e.target.value)}
+                      className="bg-gray-50 border-none h-12 rounded-lg"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                      Company
+                    </label>
+                    <Input
+                      placeholder="Company name"
+                      value={form.company}
+                      onChange={(e) => updateField("company", e.target.value)}
+                      className="bg-gray-50 border-none h-12 rounded-lg"
+                    />
+                  </div>
+                </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">
-                  Email <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="email@example.com"
-                  value={form.email}
-                  onChange={(e) => updateField("email", e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">
-                  Phone <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="(555) 123-4567"
-                  value={form.phone}
-                  onChange={(e) => updateField("phone", e.target.value)}
-                />
-              </div>
-            </div>
+                {/* Email + Phone */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                      Email <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      type="email"
+                      placeholder="email@example.com"
+                      value={form.email}
+                      onChange={(e) => updateField("email", e.target.value)}
+                      className="bg-gray-50 border-none h-12 rounded-lg"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                      Phone <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      type="tel"
+                      placeholder="(555) 123-4567"
+                      value={form.phone}
+                      onChange={(e) => updateField("phone", e.target.value)}
+                      className="bg-gray-50 border-none h-12 rounded-lg"
+                    />
+                  </div>
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
-              <Input
-                id="address"
-                placeholder="Street address"
-                value={form.address}
-                onChange={(e) => updateField("address", e.target.value)}
-              />
-            </div>
+                {/* Address */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                    Address
+                  </label>
+                  <Input
+                    placeholder="Street address"
+                    value={form.address}
+                    onChange={(e) => updateField("address", e.target.value)}
+                    className="bg-gray-50 border-none h-12 rounded-lg"
+                  />
+                </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="space-y-2 col-span-2 sm:col-span-2">
-                <Label htmlFor="city">City</Label>
-                <Input
-                  id="city"
-                  placeholder="City"
-                  value={form.city}
-                  onChange={(e) => updateField("city", e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="state">State</Label>
-                <Input
-                  id="state"
-                  placeholder="State"
-                  value={form.state}
-                  onChange={(e) => updateField("state", e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="zipCode">Zip Code</Label>
-                <Input
-                  id="zipCode"
-                  placeholder="Zip"
-                  value={form.zipCode}
-                  onChange={(e) => updateField("zipCode", e.target.value)}
-                />
-              </div>
-            </div>
+                {/* City, State, Zip */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="space-y-1.5 col-span-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                      City
+                    </label>
+                    <Input
+                      placeholder="City"
+                      value={form.city}
+                      onChange={(e) => updateField("city", e.target.value)}
+                      className="bg-gray-50 border-none h-12 rounded-lg"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                      State
+                    </label>
+                    <Input
+                      placeholder="State"
+                      value={form.state}
+                      onChange={(e) => updateField("state", e.target.value)}
+                      className="bg-gray-50 border-none h-12 rounded-lg"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                      Zip Code
+                    </label>
+                    <Input
+                      placeholder="Zip"
+                      value={form.zipCode}
+                      onChange={(e) => updateField("zipCode", e.target.value)}
+                      className="bg-gray-50 border-none h-12 rounded-lg"
+                    />
+                  </div>
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                placeholder="Any additional notes about this client..."
-                value={form.notes}
-                onChange={(e) => updateField("notes", e.target.value)}
-                rows={4}
-              />
+                {/* Notes */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                    Notes
+                  </label>
+                  <Textarea
+                    placeholder="Any additional notes about this client..."
+                    value={form.notes}
+                    onChange={(e) => updateField("notes", e.target.value)}
+                    rows={4}
+                    className="bg-gray-50 border-none rounded-lg resize-none"
+                  />
+                </div>
+              </div>
             </div>
+          </div>
 
-            <div className="flex justify-end gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.push("/clients")}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={saving}>
-                {saving ? "Saving..." : "Save Client"}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+          {/* Action buttons */}
+          <div className="flex justify-end gap-3 mt-6">
+            <button
+              type="button"
+              onClick={() => router.push("/clients")}
+              className="h-11 px-5 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-100 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="h-11 px-6 bg-gradient-to-r from-blue-700 to-blue-900 text-white text-sm font-bold rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-150 disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Save Client"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

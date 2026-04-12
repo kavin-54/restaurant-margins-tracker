@@ -65,6 +65,11 @@ catering-platform/
 - Role-based permissions: admin, kitchen-manager, prep-cook
 - First user created via signup gets `admin` role
 
+## Deployment
+- **Production URL:** https://catering-platform-sigma.vercel.app
+- **GitHub Repo:** https://github.com/kavin-54/restaurant-margins-tracker
+- Push to `main` → auto-deploys to Vercel
+
 ## Commands
 - `npm run dev` — start dev server (http://localhost:3000)
 - `npm run build` — production build

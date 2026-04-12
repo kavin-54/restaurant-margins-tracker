@@ -2,21 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import {
-  Plus,
-  Pencil,
-  Trash2,
-  Copy,
-  Check,
-  X,
-} from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LoadingScreen } from "@/components/layout/LoadingScreen";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -25,14 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -53,7 +35,7 @@ import {
   duplicateRecipe,
   type RecipeLine,
 } from "@/lib/hooks/useRecipes";
-import { useIngredients, type Ingredient } from "@/lib/hooks/useIngredients";
+import { useIngredients } from "@/lib/hooks/useIngredients";
 
 const CATEGORIES = [
   { value: "appetizer", label: "Appetizer" },
@@ -70,19 +52,19 @@ const CATEGORIES = [
   { value: "other", label: "Other" },
 ];
 
-const categoryColors: Record<string, string> = {
-  appetizer: "bg-amber-100 text-amber-800",
-  main: "bg-blue-100 text-blue-800",
-  side: "bg-green-100 text-green-800",
-  dessert: "bg-pink-100 text-pink-800",
-  sauce: "bg-orange-100 text-orange-800",
-  base: "bg-slate-100 text-slate-800",
-  marinade: "bg-purple-100 text-purple-800",
-  beverage: "bg-cyan-100 text-cyan-800",
-  bread: "bg-yellow-100 text-yellow-800",
-  salad: "bg-emerald-100 text-emerald-800",
-  soup: "bg-red-100 text-red-800",
-  other: "bg-gray-100 text-gray-800",
+const categoryBadgeColors: Record<string, string> = {
+  appetizer: "bg-purple-600 text-white",
+  main: "bg-blue-600 text-white",
+  side: "bg-green-600 text-white",
+  dessert: "bg-red-600 text-white",
+  sauce: "bg-orange-600 text-white",
+  base: "bg-slate-600 text-white",
+  marinade: "bg-purple-600 text-white",
+  beverage: "bg-cyan-600 text-white",
+  bread: "bg-yellow-600 text-white",
+  salad: "bg-emerald-600 text-white",
+  soup: "bg-red-600 text-white",
+  other: "bg-gray-600 text-white",
 };
 
 export default function RecipeDetailPage() {
@@ -105,12 +87,10 @@ export default function RecipeDetailPage() {
   const [addLineOpen, setAddLineOpen] = useState(false);
   const [editingLineId, setEditingLineId] = useState<string | null>(null);
 
-  // Add line form state
   const [lineIngredientId, setLineIngredientId] = useState("");
   const [lineQuantity, setLineQuantity] = useState("");
   const [lineNotes, setLineNotes] = useState("");
 
-  // Edit line form state
   const [editLineQuantity, setEditLineQuantity] = useState("");
   const [editLineNotes, setEditLineNotes] = useState("");
 
@@ -128,12 +108,12 @@ export default function RecipeDetailPage() {
   if (!recipe) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-muted-foreground">Recipe not found.</p>
+        <p className="text-gray-500 font-medium">Recipe not found.</p>
       </div>
     );
   }
 
-  const colorClass = categoryColors[recipe.category] || categoryColors.other;
+  const badgeColor = categoryBadgeColors[recipe.category] || categoryBadgeColors.other;
 
   async function recalculateCosts(updatedLines: RecipeLine[], servings?: number) {
     const totalRecipeCost = updatedLines.reduce((sum, l) => sum + l.lineCost, 0);
@@ -290,408 +270,354 @@ export default function RecipeDetailPage() {
     setEditLineNotes(line.notes || "");
   }
 
+  const totalCost = (lines || []).reduce((sum, l) => sum + l.lineCost, 0);
+  const costPerServing = recipe.servings > 0 ? totalCost / recipe.servings : 0;
+
   return (
     <div>
       <PageHeader title={recipe.name} backHref="/recipes" />
 
-      {/* Recipe Info Card */}
-      <Card className="mb-6">
-        <CardContent className="p-6">
-          {editing ? (
-            <div className="space-y-4">
+      {editing ? (
+        /* Edit mode */
+        <div className="bg-white rounded-2xl ambient-shadow p-6 mb-6">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Recipe Name</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Recipe Name</Label>
+                <Label>Category</Label>
+                <Select value={editCategory} onValueChange={setEditCategory}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Servings</Label>
                 <Input
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
+                  type="number"
+                  min="1"
+                  value={editServings}
+                  onChange={(e) => setEditServings(e.target.value)}
                 />
-              </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Select value={editCategory} onValueChange={setEditCategory}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Servings</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={editServings}
-                    onChange={(e) => setEditServings(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Textarea
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  rows={3}
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" onClick={handleSaveEdit}>
-                  <Check className="mr-1 h-4 w-4" />
-                  Save
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setEditing(false)}
-                >
-                  <X className="mr-1 h-4 w-4" />
-                  Cancel
-                </Button>
               </div>
             </div>
-          ) : (
-            <div>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-2">
-                  <Badge variant="secondary" className={colorClass}>
-                    {recipe.category}
-                  </Badge>
-                  {recipe.description && (
-                    <p className="text-sm text-muted-foreground">
-                      {recipe.description}
-                    </p>
-                  )}
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSaveEdit}
+                className="h-10 bg-gradient-to-r from-blue-700 to-blue-900 text-white text-sm font-bold rounded-xl px-5 flex items-center gap-2 hover:shadow-md active:scale-95 transition-all duration-150"
+              >
+                <span className="material-symbols-outlined text-lg">check</span>
+                Save
+              </button>
+              <button
+                onClick={() => setEditing(false)}
+                className="h-10 bg-white text-gray-600 text-sm font-bold rounded-xl border border-gray-200 px-5 flex items-center gap-2 hover:bg-gray-50 transition-all duration-150"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Two-column layout */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left column */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Image placeholder */}
+            <div className="bg-white rounded-2xl ambient-shadow overflow-hidden">
+              <div className="h-56 bg-gray-200 flex items-center justify-center">
+                <span className="material-symbols-outlined text-gray-400 text-6xl">restaurant</span>
+              </div>
+              <div className="p-4 flex items-center gap-2">
+                <span className={`rounded-full px-3 py-1 text-xs font-bold ${badgeColor}`}>
+                  {recipe.category}
+                </span>
+                {recipe.description && (
+                  <p className="text-sm text-gray-500 line-clamp-1">{recipe.description}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Cost summary card */}
+            <div className="bg-white rounded-2xl ambient-shadow p-5">
+              <h3 className="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-4">Cost Summary</h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500 font-medium">Servings</span>
+                  <span className="text-sm font-bold text-gray-900">{recipe.servings}</span>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setEditing(true)}
-                  >
-                    <Pencil className="mr-1 h-4 w-4" />
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleDuplicate}
-                  >
-                    <Copy className="mr-1 h-4 w-4" />
-                    Duplicate
-                  </Button>
-                  <Dialog
-                    open={deleteDialogOpen}
-                    onOpenChange={setDeleteDialogOpen}
-                  >
-                    <DialogTrigger asChild>
-                      <Button size="sm" variant="destructive">
-                        <Trash2 className="mr-1 h-4 w-4" />
-                        Delete
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Delete Recipe</DialogTitle>
-                      </DialogHeader>
-                      <p className="text-sm text-muted-foreground">
-                        Are you sure you want to delete &quot;{recipe.name}
-                        &quot;? This action cannot be undone.
-                      </p>
-                      <div className="flex justify-end gap-2 pt-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500 font-medium">Total Cost</span>
+                  <span className="text-sm font-bold text-blue-700">{formatCurrency(totalCost)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500 font-medium">Cost per Serving</span>
+                  <span className="text-sm font-bold text-blue-700">{formatCurrency(costPerServing)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500 font-medium">Ingredients</span>
+                  <span className="text-sm font-bold text-gray-900">{lines?.length ?? 0}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => setEditing(true)}
+                className="h-10 bg-white text-gray-700 text-sm font-bold rounded-xl border border-gray-200 px-4 flex items-center gap-2 hover:bg-gray-50 transition-all duration-150 w-full"
+              >
+                <span className="material-symbols-outlined text-lg">edit</span>
+                Edit Recipe
+              </button>
+              <button
+                onClick={handleDuplicate}
+                className="h-10 bg-white text-gray-700 text-sm font-bold rounded-xl border border-gray-200 px-4 flex items-center gap-2 hover:bg-gray-50 transition-all duration-150 w-full"
+              >
+                <span className="material-symbols-outlined text-lg">content_copy</span>
+                Duplicate
+              </button>
+              <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <DialogTrigger asChild>
+                  <button className="h-10 bg-white text-red-600 text-sm font-bold rounded-xl border border-red-200 px-4 flex items-center gap-2 hover:bg-red-50 transition-all duration-150 w-full">
+                    <span className="material-symbols-outlined text-lg">delete</span>
+                    Delete Recipe
+                  </button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Delete Recipe</DialogTitle>
+                  </DialogHeader>
+                  <p className="text-sm text-gray-500">
+                    Are you sure you want to delete &quot;{recipe.name}&quot;? This action cannot be undone.
+                  </p>
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button variant="destructive" onClick={handleDelete}>
+                      Delete
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+
+          {/* Right column */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Ingredient lines */}
+            <div className="bg-white rounded-2xl ambient-shadow">
+              <div className="flex items-center justify-between p-5 pb-0">
+                <h2 className="text-lg font-bold text-gray-900">Ingredient Lines</h2>
+                <Dialog open={addLineOpen} onOpenChange={(open) => {
+                  setAddLineOpen(open);
+                  if (!open) resetLineForm();
+                }}>
+                  <DialogTrigger asChild>
+                    <button className="h-9 bg-gradient-to-r from-blue-700 to-blue-900 text-white text-sm font-bold rounded-xl px-4 flex items-center gap-1.5 hover:shadow-md active:scale-95 transition-all duration-150">
+                      <span className="material-symbols-outlined text-base">add</span>
+                      Add Ingredient
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add Ingredient</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-2">
+                      <div className="space-y-2">
+                        <Label>Ingredient</Label>
+                        <Select value={lineIngredientId} onValueChange={setLineIngredientId}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select ingredient" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(ingredients || []).map((ing) => (
+                              <SelectItem key={ing.id} value={ing.id}>
+                                {ing.name} ({formatCurrency(ing.costPerUnit)}/{ing.unit})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Quantity</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="e.g., 2.5"
+                          value={lineQuantity}
+                          onChange={(e) => setLineQuantity(e.target.value)}
+                        />
+                        {lineIngredientId && (
+                          <p className="text-xs text-gray-400">
+                            Unit: {ingredients?.find((i) => i.id === lineIngredientId)?.unit}
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Notes (optional)</Label>
+                        <Input
+                          placeholder="e.g., diced, room temperature"
+                          value={lineNotes}
+                          onChange={(e) => setLineNotes(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2 pt-2">
                         <Button
                           variant="outline"
-                          onClick={() => setDeleteDialogOpen(false)}
+                          onClick={() => {
+                            setAddLineOpen(false);
+                            resetLineForm();
+                          }}
                         >
                           Cancel
                         </Button>
-                        <Button variant="destructive" onClick={handleDelete}>
-                          Delete
-                        </Button>
+                        <Button onClick={handleAddLine}>Add</Button>
                       </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <div className="rounded-lg bg-muted/50 p-3">
-                  <p className="text-xs text-muted-foreground">Servings</p>
-                  <p className="text-lg font-semibold">{recipe.servings}</p>
-                </div>
-                <div className="rounded-lg bg-muted/50 p-3">
-                  <p className="text-xs text-muted-foreground">Total Cost</p>
-                  <p className="text-lg font-semibold">
-                    {formatCurrency(recipe.totalRecipeCost)}
-                  </p>
-                </div>
-                <div className="rounded-lg bg-muted/50 p-3">
-                  <p className="text-xs text-muted-foreground">
-                    Cost per Serving
-                  </p>
-                  <p className="text-lg font-semibold">
-                    {formatCurrency(recipe.costPerServing)}
-                  </p>
-                </div>
-                <div className="rounded-lg bg-muted/50 p-3">
-                  <p className="text-xs text-muted-foreground">Ingredients</p>
-                  <p className="text-lg font-semibold">
-                    {lines?.length ?? 0}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Ingredient Lines */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-4">
-          <CardTitle className="text-lg">Ingredient Lines</CardTitle>
-          <Dialog open={addLineOpen} onOpenChange={(open) => {
-            setAddLineOpen(open);
-            if (!open) resetLineForm();
-          }}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="mr-1 h-4 w-4" />
-                Add Ingredient
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Ingredient</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-2">
-                <div className="space-y-2">
-                  <Label>Ingredient</Label>
-                  <Select
-                    value={lineIngredientId}
-                    onValueChange={setLineIngredientId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select ingredient" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(ingredients || []).map((ing) => (
-                        <SelectItem key={ing.id} value={ing.id}>
-                          {ing.name} ({formatCurrency(ing.costPerUnit)}/{ing.unit})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Quantity</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="any"
-                    placeholder="e.g., 2.5"
-                    value={lineQuantity}
-                    onChange={(e) => setLineQuantity(e.target.value)}
-                  />
-                  {lineIngredientId && (
-                    <p className="text-xs text-muted-foreground">
-                      Unit:{" "}
-                      {ingredients?.find((i) => i.id === lineIngredientId)?.unit}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Notes (optional)</Label>
-                  <Input
-                    placeholder="e.g., diced, room temperature"
-                    value={lineNotes}
-                    onChange={(e) => setLineNotes(e.target.value)}
-                  />
-                </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setAddLineOpen(false);
-                      resetLineForm();
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button onClick={handleAddLine}>Add</Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </CardHeader>
-        <CardContent className="px-0 pb-0">
-          {linesLoading ? (
-            <div className="flex justify-center py-8">
-              <p className="text-sm text-muted-foreground">Loading...</p>
-            </div>
-          ) : !lines || lines.length === 0 ? (
-            <div className="px-6 pb-6 text-center text-sm text-muted-foreground">
-              No ingredients added yet. Click &quot;Add Ingredient&quot; to get
-              started.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ingredient</TableHead>
-                    <TableHead className="w-[80px]">Qty</TableHead>
-                    <TableHead className="w-[70px]">Unit</TableHead>
-                    <TableHead className="w-[100px]">Cost/Unit</TableHead>
-                    <TableHead className="w-[100px]">Line Cost</TableHead>
-                    <TableHead>Notes</TableHead>
-                    <TableHead className="w-[100px] text-right">
-                      Actions
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {lines.map((line) => (
-                    <TableRow key={line.id}>
-                      {editingLineId === line.id ? (
-                        <>
-                          <TableCell className="font-medium">
-                            {line.ingredientName}
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              min="0"
-                              step="any"
-                              className="h-8 w-20"
-                              value={editLineQuantity}
-                              onChange={(e) =>
-                                setEditLineQuantity(e.target.value)
-                              }
-                            />
-                          </TableCell>
-                          <TableCell>{line.unit}</TableCell>
-                          <TableCell>
-                            {formatCurrency(line.costPerUnit)}
-                          </TableCell>
-                          <TableCell>
-                            {formatCurrency(
-                              Number(editLineQuantity) * line.costPerUnit
+              <div className="p-5">
+                {linesLoading ? (
+                  <div className="flex justify-center py-8">
+                    <p className="text-sm text-gray-400 font-medium">Loading...</p>
+                  </div>
+                ) : !lines || lines.length === 0 ? (
+                  <div className="py-8 text-center text-sm text-gray-400 font-medium">
+                    No ingredients added yet. Click &quot;Add Ingredient&quot; to get started.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-gray-100">
+                          <th className="text-left pb-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest">Ingredient</th>
+                          <th className="text-left pb-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest w-[80px]">Qty</th>
+                          <th className="text-left pb-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest w-[70px]">Unit</th>
+                          <th className="text-left pb-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest w-[100px]">Cost/Unit</th>
+                          <th className="text-left pb-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest w-[100px]">Line Cost</th>
+                          <th className="text-left pb-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest">Notes</th>
+                          <th className="text-right pb-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest w-[100px]">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {lines.map((line) => (
+                          <tr key={line.id} className="border-b border-gray-50 last:border-0">
+                            {editingLineId === line.id ? (
+                              <>
+                                <td className="py-3 text-sm font-medium text-gray-900">{line.ingredientName}</td>
+                                <td className="py-3">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    className="h-8 w-20"
+                                    value={editLineQuantity}
+                                    onChange={(e) => setEditLineQuantity(e.target.value)}
+                                  />
+                                </td>
+                                <td className="py-3 text-sm text-gray-500">{line.unit}</td>
+                                <td className="py-3 text-sm text-gray-500">{formatCurrency(line.costPerUnit)}</td>
+                                <td className="py-3 text-sm font-bold text-blue-700">
+                                  {formatCurrency(Number(editLineQuantity) * line.costPerUnit)}
+                                </td>
+                                <td className="py-3">
+                                  <Input
+                                    className="h-8"
+                                    value={editLineNotes}
+                                    onChange={(e) => setEditLineNotes(e.target.value)}
+                                    placeholder="Notes"
+                                  />
+                                </td>
+                                <td className="py-3 text-right">
+                                  <div className="flex justify-end gap-1">
+                                    <button
+                                      onClick={() => handleUpdateLine(line)}
+                                      className="w-7 h-7 rounded-lg flex items-center justify-center text-green-600 hover:bg-green-50 transition-colors"
+                                    >
+                                      <span className="material-symbols-outlined text-lg">check</span>
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingLineId(null)}
+                                      className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors"
+                                    >
+                                      <span className="material-symbols-outlined text-lg">close</span>
+                                    </button>
+                                  </div>
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="py-3 text-sm font-medium text-gray-900">{line.ingredientName}</td>
+                                <td className="py-3 text-sm text-gray-700">{line.quantity}</td>
+                                <td className="py-3 text-sm text-gray-500">{line.unit}</td>
+                                <td className="py-3 text-sm text-gray-500">{formatCurrency(line.costPerUnit)}</td>
+                                <td className="py-3 text-sm font-bold text-blue-700">{formatCurrency(line.lineCost)}</td>
+                                <td className="py-3 text-sm text-gray-400">{line.notes || "-"}</td>
+                                <td className="py-3 text-right">
+                                  <div className="flex justify-end gap-1">
+                                    <button
+                                      onClick={() => startEditLine(line)}
+                                      className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                                    >
+                                      <span className="material-symbols-outlined text-base">edit</span>
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteLine(line.id)}
+                                      className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                                    >
+                                      <span className="material-symbols-outlined text-base">delete</span>
+                                    </button>
+                                  </div>
+                                </td>
+                              </>
                             )}
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              className="h-8"
-                              value={editLineNotes}
-                              onChange={(e) =>
-                                setEditLineNotes(e.target.value)
-                              }
-                              placeholder="Notes"
-                            />
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7"
-                                onClick={() => handleUpdateLine(line)}
-                              >
-                                <Check className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7"
-                                onClick={() => setEditingLineId(null)}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </>
-                      ) : (
-                        <>
-                          <TableCell className="font-medium">
-                            {line.ingredientName}
-                          </TableCell>
-                          <TableCell>{line.quantity}</TableCell>
-                          <TableCell>{line.unit}</TableCell>
-                          <TableCell>
-                            {formatCurrency(line.costPerUnit)}
-                          </TableCell>
-                          <TableCell>
-                            {formatCurrency(line.lineCost)}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {line.notes || "-"}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7"
-                                onClick={() => startEditLine(line)}
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7 text-destructive hover:text-destructive"
-                                onClick={() => handleDeleteLine(line.id)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Cost Summary */}
-      {lines && lines.length > 0 && (
-        <Card className="mt-6">
-          <CardContent className="p-6">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  Total Recipe Cost
-                </p>
-                <p className="text-2xl font-bold">
-                  {formatCurrency(
-                    lines.reduce((sum, l) => sum + l.lineCost, 0)
-                  )}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground">
-                  Cost per Serving ({recipe.servings} servings)
-                </p>
-                <p className="text-2xl font-bold">
-                  {formatCurrency(
-                    recipe.servings > 0
-                      ? lines.reduce((sum, l) => sum + l.lineCost, 0) /
-                          recipe.servings
-                      : 0
-                  )}
-                </p>
-              </div>
+            {/* Instructions placeholder */}
+            <div className="bg-white rounded-2xl ambient-shadow p-5">
+              <h3 className="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-4">Instructions</h3>
+              {recipe.description ? (
+                <p className="text-sm text-gray-600 leading-relaxed">{recipe.description}</p>
+              ) : (
+                <p className="text-sm text-gray-400 italic">No instructions added yet.</p>
+              )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
     </div>
   );

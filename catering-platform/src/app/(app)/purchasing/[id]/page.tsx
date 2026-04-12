@@ -2,21 +2,9 @@
 
 import React, { useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import {
-  ShoppingCart,
-  Truck,
-  Check,
-  AlertTriangle,
-  Plus,
-  Save,
-} from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LoadingScreen } from "@/components/layout/LoadingScreen";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -24,14 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -46,9 +26,9 @@ import { useToast } from "@/components/ui/use-toast";
 import type { PurchaseOrder, POLine, POStatus } from "@/lib/types/purchaseOrder";
 
 const statusBadgeStyles: Record<POStatus, string> = {
-  draft: "bg-gray-100 text-gray-700",
+  draft: "bg-gray-100 text-gray-600",
   sent: "bg-blue-100 text-blue-700",
-  "partially-received": "bg-yellow-100 text-yellow-700",
+  "partially-received": "bg-amber-100 text-amber-700",
   "fully-received": "bg-green-100 text-green-700",
 };
 
@@ -73,11 +53,11 @@ const nextStatusLabels: Record<POStatus, string> = {
   "fully-received": "",
 };
 
-const nextStatusIcons: Record<POStatus, React.ReactNode> = {
-  draft: <Truck className="h-4 w-4" />,
-  sent: <ShoppingCart className="h-4 w-4" />,
-  "partially-received": <Check className="h-4 w-4" />,
-  "fully-received": null,
+const nextStatusIcons: Record<POStatus, string> = {
+  draft: "local_shipping",
+  sent: "shopping_cart",
+  "partially-received": "check_circle",
+  "fully-received": "",
 };
 
 const qualityOptions = [
@@ -95,7 +75,7 @@ const qualityBadgeStyles: Record<string, string> = {
 };
 
 function formatDate(date: Date | any): string {
-  if (!date) return "—";
+  if (!date) return "\u2014";
   const d = date instanceof Date ? date : date.toDate?.() ?? new Date(date);
   return d.toLocaleDateString("en-US", {
     month: "short",
@@ -143,7 +123,6 @@ export default function PurchaseOrderDetailPage() {
   const isReceiving =
     po?.status === "sent" || po?.status === "partially-received";
 
-  // Initialize receiving data from existing line data
   function getReceivingValue(
     lineId: string,
     field: keyof ReceivingData[string],
@@ -294,7 +273,6 @@ export default function PurchaseOrderDetailPage() {
         expectedTotalCost: packsToOrder * expectedCostPerPack,
       });
 
-      // Recalculate estimated total
       const currentEstimated = lines?.reduce(
         (sum, l) => sum + (l.expectedTotalCost || 0),
         0
@@ -333,18 +311,19 @@ export default function PurchaseOrderDetailPage() {
   if (!po) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
-        <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
-        <h2 className="text-lg font-semibold">Purchase Order Not Found</h2>
-        <p className="text-sm text-muted-foreground mt-1">
+        <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+          <span className="material-symbols-outlined text-gray-400 text-3xl">warning</span>
+        </div>
+        <h2 className="text-lg font-bold text-gray-900">Purchase Order Not Found</h2>
+        <p className="text-sm text-gray-500 mt-1 font-medium">
           This purchase order may have been deleted.
         </p>
-        <Button
-          variant="outline"
-          className="mt-4"
+        <button
+          className="mt-4 h-10 px-5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
           onClick={() => router.push("/purchasing")}
         >
           Back to Purchase Orders
-        </Button>
+        </button>
       </div>
     );
   }
@@ -352,7 +331,7 @@ export default function PurchaseOrderDetailPage() {
   return (
     <div>
       <PageHeader
-        title={`PO — ${po.vendorName}`}
+        title={`PO \u2014 ${po.vendorName}`}
         description={`Week of ${formatDate(po.weekStartDate)}`}
         backHref="/purchasing"
         action={
@@ -360,7 +339,7 @@ export default function PurchaseOrderDetailPage() {
             ? {
                 label: "Add Line Item",
                 onClick: () => setShowAddLineDialog(true),
-                icon: <Plus className="h-4 w-4" />,
+                icon: "add",
               }
             : undefined
         }
@@ -368,371 +347,289 @@ export default function PurchaseOrderDetailPage() {
 
       {/* Status & Summary Row */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground mb-2">Status</p>
-            <div className="flex items-center gap-3">
-              <Badge
-                variant="secondary"
-                className={`text-sm ${statusBadgeStyles[po.status]}`}
+        <div className="bg-white rounded-2xl ambient-shadow p-5">
+          <p className="text-xs uppercase font-bold text-gray-400 tracking-wider mb-2">Status</p>
+          <div className="flex items-center gap-3">
+            <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${statusBadgeStyles[po.status]}`}>
+              {statusLabels[po.status]}
+            </span>
+            {nextStatusMap[po.status] && (
+              <button
+                onClick={handleAdvanceStatus}
+                className="h-8 px-3 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors inline-flex items-center gap-1.5"
               >
-                {statusLabels[po.status]}
-              </Badge>
-              {nextStatusMap[po.status] && (
-                <Button size="sm" variant="outline" onClick={handleAdvanceStatus}>
-                  {nextStatusIcons[po.status]}
-                  <span className="ml-1.5">
-                    {nextStatusLabels[po.status]}
-                  </span>
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground mb-1">Estimated Total</p>
-            <p className="text-2xl font-bold">
-              {formatCurrency(po.estimatedTotal || summaryData.estimated)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground mb-1">Actual Total</p>
-            <p className="text-2xl font-bold">
-              {po.actualTotal || summaryData.actual
-                ? formatCurrency(po.actualTotal || summaryData.actual)
-                : "—"}
-            </p>
-            {po.actualTotal > 0 && po.estimatedTotal > 0 && (
-              <p
-                className={`text-xs mt-1 ${
-                  po.actualTotal > po.estimatedTotal
-                    ? "text-red-600"
-                    : "text-green-600"
-                }`}
-              >
-                {po.actualTotal > po.estimatedTotal ? "+" : ""}
-                {formatCurrency(po.actualTotal - po.estimatedTotal)} vs estimate
-              </p>
+                <span className="material-symbols-outlined text-sm">{nextStatusIcons[po.status]}</span>
+                {nextStatusLabels[po.status]}
+              </button>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl ambient-shadow p-5">
+          <p className="text-xs uppercase font-bold text-gray-400 tracking-wider mb-1">Estimated Total</p>
+          <p className="text-2xl font-extrabold text-gray-900">
+            {formatCurrency(po.estimatedTotal || summaryData.estimated)}
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl ambient-shadow p-5">
+          <p className="text-xs uppercase font-bold text-gray-400 tracking-wider mb-1">Actual Total</p>
+          <p className="text-2xl font-extrabold text-gray-900">
+            {po.actualTotal || summaryData.actual
+              ? formatCurrency(po.actualTotal || summaryData.actual)
+              : "\u2014"}
+          </p>
+          {po.actualTotal > 0 && po.estimatedTotal > 0 && (
+            <p
+              className={`text-xs mt-1 font-semibold ${
+                po.actualTotal > po.estimatedTotal
+                  ? "text-red-600"
+                  : "text-green-600"
+              }`}
+            >
+              {po.actualTotal > po.estimatedTotal ? "+" : ""}
+              {formatCurrency(po.actualTotal - po.estimatedTotal)} vs estimate
+            </p>
+          )}
+        </div>
       </div>
 
       {/* PO Lines Table */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-base">Order Lines</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {lines && lines.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ingredient</TableHead>
-                    <TableHead className="hidden sm:table-cell">
-                      Qty Needed
-                    </TableHead>
-                    <TableHead className="hidden md:table-cell">
-                      Pack Size
-                    </TableHead>
-                    <TableHead>Packs</TableHead>
-                    <TableHead className="text-right">Expected Cost</TableHead>
-                    {(po.status !== "draft") && (
+      <div className="bg-white rounded-2xl ambient-shadow mb-6 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h2 className="text-sm font-bold text-gray-900">Order Lines</h2>
+        </div>
+        {lines && lines.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50/50 border-b border-gray-100">
+                  <th className="text-left px-5 py-3 uppercase tracking-widest text-[10px] font-bold text-gray-400">Ingredient</th>
+                  <th className="text-left px-5 py-3 uppercase tracking-widest text-[10px] font-bold text-gray-400 hidden sm:table-cell">Qty Needed</th>
+                  <th className="text-left px-5 py-3 uppercase tracking-widest text-[10px] font-bold text-gray-400 hidden md:table-cell">Pack Size</th>
+                  <th className="text-left px-5 py-3 uppercase tracking-widest text-[10px] font-bold text-gray-400">Packs</th>
+                  <th className="text-right px-5 py-3 uppercase tracking-widest text-[10px] font-bold text-gray-400">Expected Cost</th>
+                  {po.status !== "draft" && (
+                    <>
+                      <th className="text-right px-5 py-3 uppercase tracking-widest text-[10px] font-bold text-gray-400 hidden lg:table-cell">Actual Cost</th>
+                      <th className="text-left px-5 py-3 uppercase tracking-widest text-[10px] font-bold text-gray-400 hidden lg:table-cell">Quality</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {lines.map((line) => (
+                  <tr key={line.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors">
+                    <td className="px-5 py-3.5 text-sm font-semibold text-gray-900">{line.ingredientName}</td>
+                    <td className="px-5 py-3.5 text-sm text-gray-600 hidden sm:table-cell">
+                      {line.quantityNeeded} {line.quantityNeededUnit}
+                    </td>
+                    <td className="px-5 py-3.5 text-sm text-gray-600 hidden md:table-cell">{line.packSize || "\u2014"}</td>
+                    <td className="px-5 py-3.5 text-sm text-gray-700">{line.packsToOrder}</td>
+                    <td className="px-5 py-3.5 text-sm text-gray-700 text-right">{formatCurrency(line.expectedTotalCost)}</td>
+                    {po.status !== "draft" && (
                       <>
-                        <TableHead className="text-right hidden lg:table-cell">
-                          Actual Cost
-                        </TableHead>
-                        <TableHead className="hidden lg:table-cell">
-                          Quality
-                        </TableHead>
+                        <td className="px-5 py-3.5 text-sm text-gray-700 text-right hidden lg:table-cell">
+                          {line.actualTotalCost ? formatCurrency(line.actualTotalCost) : "\u2014"}
+                        </td>
+                        <td className="px-5 py-3.5 hidden lg:table-cell">
+                          {line.qualityFlag ? (
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${qualityBadgeStyles[line.qualityFlag] || ""}`}>
+                              {line.qualityFlag}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-gray-400">\u2014</span>
+                          )}
+                        </td>
                       </>
                     )}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {lines.map((line) => (
-                    <TableRow key={line.id}>
-                      <TableCell className="font-medium">
-                        {line.ingredientName}
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        {line.quantityNeeded} {line.quantityNeededUnit}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {line.packSize || "—"}
-                      </TableCell>
-                      <TableCell>{line.packsToOrder}</TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(line.expectedTotalCost)}
-                      </TableCell>
-                      {(po.status !== "draft") && (
-                        <>
-                          <TableCell className="text-right hidden lg:table-cell">
-                            {line.actualTotalCost
-                              ? formatCurrency(line.actualTotalCost)
-                              : "—"}
-                          </TableCell>
-                          <TableCell className="hidden lg:table-cell">
-                            {line.qualityFlag ? (
-                              <Badge
-                                variant="secondary"
-                                className={
-                                  qualityBadgeStyles[line.qualityFlag] || ""
-                                }
-                              >
-                                {line.qualityFlag}
-                              </Badge>
-                            ) : (
-                              "—"
-                            )}
-                          </TableCell>
-                        </>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="py-12 text-center text-muted-foreground">
-              <p>No line items yet.</p>
-              {po.status === "draft" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  onClick={() => setShowAddLineDialog(true)}
-                >
-                  <Plus className="h-4 w-4 mr-1.5" />
-                  Add Line Item
-                </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="py-12 text-center">
+            <p className="text-sm text-gray-500 font-medium">No line items yet.</p>
+            {po.status === "draft" && (
+              <button
+                onClick={() => setShowAddLineDialog(true)}
+                className="mt-3 h-9 px-4 rounded-xl border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors inline-flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-sm">add</span>
+                Add Line Item
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Receiving Section */}
       {isReceiving && lines && lines.length > 0 && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Receiving</CardTitle>
-            <Button
-              size="sm"
+        <div className="bg-white rounded-2xl ambient-shadow overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-gray-900">Receiving</h2>
+            <button
               onClick={handleSaveReceiving}
               disabled={saving}
+              className="h-9 px-4 bg-gradient-to-r from-blue-700 to-blue-900 text-white text-xs font-bold rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-150 inline-flex items-center gap-1.5 disabled:opacity-50"
             >
-              <Save className="h-4 w-4 mr-1.5" />
+              <span className="material-symbols-outlined text-sm">save</span>
               {saving ? "Saving..." : "Save Receiving"}
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {lines.map((line) => (
-                <div
-                  key={line.id}
-                  className="rounded-lg border p-4 space-y-3"
-                >
-                  <p className="font-medium text-sm">{line.ingredientName}</p>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Qty Received</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="any"
-                        placeholder={String(line.packsToOrder)}
-                        value={getReceivingValue(
-                          line.id,
-                          "actualQuantityReceived",
-                          line.actualQuantityReceived
-                        )}
-                        onChange={(e) =>
-                          updateReceivingField(
-                            line.id,
-                            "actualQuantityReceived",
-                            e.target.value
-                          )
-                        }
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Cost per Pack</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder={String(line.expectedCostPerPack)}
-                        value={getReceivingValue(
-                          line.id,
-                          "actualCostPerPack",
-                          line.actualCostPerPack
-                        )}
-                        onChange={(e) =>
-                          updateReceivingField(
-                            line.id,
-                            "actualCostPerPack",
-                            e.target.value
-                          )
-                        }
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Quality</Label>
-                      <Select
-                        value={
-                          (getReceivingValue(
-                            line.id,
-                            "qualityFlag",
-                            line.qualityFlag
-                          ) as string) || ""
-                        }
-                        onValueChange={(v) =>
-                          updateReceivingField(line.id, "qualityFlag", v)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {qualityOptions.map((q) => (
-                            <SelectItem key={q.value} value={q.value}>
-                              {q.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Notes</Label>
-                      <Input
-                        placeholder="Optional notes"
-                        value={getReceivingValue(
-                          line.id,
-                          "receivingNotes",
-                          line.receivingNotes
-                        )}
-                        onChange={(e) =>
-                          updateReceivingField(
-                            line.id,
-                            "receivingNotes",
-                            e.target.value
-                          )
-                        }
-                      />
-                    </div>
+            </button>
+          </div>
+          <div className="p-5 space-y-4">
+            {lines.map((line) => (
+              <div
+                key={line.id}
+                className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 space-y-3"
+              >
+                <p className="font-semibold text-sm text-gray-900">{line.ingredientName}</p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Qty Received</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      placeholder={String(line.packsToOrder)}
+                      value={getReceivingValue(line.id, "actualQuantityReceived", line.actualQuantityReceived)}
+                      onChange={(e) => updateReceivingField(line.id, "actualQuantityReceived", e.target.value)}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Cost per Pack</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder={String(line.expectedCostPerPack)}
+                      value={getReceivingValue(line.id, "actualCostPerPack", line.actualCostPerPack)}
+                      onChange={(e) => updateReceivingField(line.id, "actualCostPerPack", e.target.value)}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Quality</label>
+                    <Select
+                      value={
+                        (getReceivingValue(line.id, "qualityFlag", line.qualityFlag) as string) || ""
+                      }
+                      onValueChange={(v) => updateReceivingField(line.id, "qualityFlag", v)}
+                    >
+                      <SelectTrigger className="bg-white rounded-lg border-gray-200">
+                        <SelectValue placeholder="Select..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {qualityOptions.map((q) => (
+                          <SelectItem key={q.value} value={q.value}>
+                            {q.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Notes</label>
+                    <input
+                      placeholder="Optional notes"
+                      value={getReceivingValue(line.id, "receivingNotes", line.receivingNotes)}
+                      onChange={(e) => updateReceivingField(line.id, "receivingNotes", e.target.value)}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                    />
                   </div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Add Line Dialog */}
       <Dialog open={showAddLineDialog} onOpenChange={setShowAddLineDialog}>
-        <DialogContent>
+        <DialogContent className="rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Add Line Item</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-gray-900">Add Line Item</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-2">
-              <Label>Ingredient Name</Label>
-              <Input
+              <Label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Ingredient Name</Label>
+              <input
                 placeholder="e.g. Chicken Breast"
                 value={newLine.ingredientName}
-                onChange={(e) =>
-                  setNewLine({ ...newLine, ingredientName: e.target.value })
-                }
+                onChange={(e) => setNewLine({ ...newLine, ingredientName: e.target.value })}
+                className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Qty Needed</Label>
-                <Input
+                <Label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Qty Needed</Label>
+                <input
                   type="number"
                   min="0"
                   step="any"
                   value={newLine.quantityNeeded}
-                  onChange={(e) =>
-                    setNewLine({ ...newLine, quantityNeeded: e.target.value })
-                  }
+                  onChange={(e) => setNewLine({ ...newLine, quantityNeeded: e.target.value })}
+                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Unit</Label>
-                <Input
+                <Label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Unit</Label>
+                <input
                   placeholder="e.g. lbs, oz, ea"
                   value={newLine.quantityNeededUnit}
-                  onChange={(e) =>
-                    setNewLine({
-                      ...newLine,
-                      quantityNeededUnit: e.target.value,
-                    })
-                  }
+                  onChange={(e) => setNewLine({ ...newLine, quantityNeededUnit: e.target.value })}
+                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Pack Size</Label>
-                <Input
+                <Label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Pack Size</Label>
+                <input
                   placeholder="e.g. 10 lb case"
                   value={newLine.packSize}
-                  onChange={(e) =>
-                    setNewLine({ ...newLine, packSize: e.target.value })
-                  }
+                  onChange={(e) => setNewLine({ ...newLine, packSize: e.target.value })}
+                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Packs to Order</Label>
-                <Input
+                <Label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Packs to Order</Label>
+                <input
                   type="number"
                   min="1"
                   value={newLine.packsToOrder}
-                  onChange={(e) =>
-                    setNewLine({ ...newLine, packsToOrder: e.target.value })
-                  }
+                  onChange={(e) => setNewLine({ ...newLine, packsToOrder: e.target.value })}
+                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Expected Cost per Pack ($)</Label>
-              <Input
+              <Label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Expected Cost per Pack ($)</Label>
+              <input
                 type="number"
                 min="0"
                 step="0.01"
                 value={newLine.expectedCostPerPack}
-                onChange={(e) =>
-                  setNewLine({
-                    ...newLine,
-                    expectedCostPerPack: e.target.value,
-                  })
-                }
+                onChange={(e) => setNewLine({ ...newLine, expectedCostPerPack: e.target.value })}
+                className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
               />
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button
-                variant="outline"
+              <button
                 onClick={() => setShowAddLineDialog(false)}
+                className="h-10 px-4 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
               >
                 Cancel
-              </Button>
-              <Button
+              </button>
+              <button
                 onClick={handleAddLine}
-                disabled={
-                  !newLine.ingredientName.trim() ||
-                  !Number(newLine.packsToOrder)
-                }
+                disabled={!newLine.ingredientName.trim() || !Number(newLine.packsToOrder)}
+                className="h-10 px-5 bg-gradient-to-r from-blue-700 to-blue-900 text-white text-sm font-bold rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Add Item
-              </Button>
+              </button>
             </div>
           </div>
         </DialogContent>

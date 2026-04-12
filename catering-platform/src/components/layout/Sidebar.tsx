@@ -6,22 +6,6 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { hasPermission } from "@/lib/utils/permissions";
-import {
-  ChefHat,
-  LayoutDashboard,
-  Egg,
-  BookOpen,
-  CalendarDays,
-  Users,
-  Truck,
-  ShoppingCart,
-  Package,
-  Trash2,
-  BarChart3,
-  Settings,
-  LogOut,
-  X,
-} from "lucide-react";
 
 interface SidebarProps {
   open: boolean;
@@ -29,17 +13,17 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard, permission: null },
-  { href: "/events", label: "Events", icon: CalendarDays, permission: "manage_events" as const },
-  { href: "/recipes", label: "Recipes", icon: BookOpen, permission: "view_recipes" as const },
-  { href: "/ingredients", label: "Ingredients", icon: Egg, permission: "view_recipes" as const },
-  { href: "/clients", label: "Clients", icon: Users, permission: "view_clients" as const },
-  { href: "/vendors", label: "Vendors", icon: Truck, permission: "manage_purchasing" as const },
-  { href: "/purchasing", label: "Purchasing", icon: ShoppingCart, permission: "manage_purchasing" as const },
-  { href: "/inventory", label: "Inventory", icon: Package, permission: "view_inventory" as const },
-  { href: "/waste", label: "Waste", icon: Trash2, permission: "log_waste" as const },
-  { href: "/reports", label: "Reports", icon: BarChart3, permission: "view_reports" as const },
-  { href: "/settings", label: "Settings", icon: Settings, permission: "manage_system" as const },
+  { href: "/", label: "Dashboard", icon: "dashboard", permission: null },
+  { href: "/events", label: "Events", icon: "event", permission: "manage_events" as const },
+  { href: "/recipes", label: "Recipes", icon: "menu_book", permission: "view_recipes" as const },
+  { href: "/ingredients", label: "Ingredients", icon: "egg_alt", permission: "view_recipes" as const },
+  { href: "/clients", label: "Clients", icon: "group", permission: "view_clients" as const },
+  { href: "/vendors", label: "Vendors", icon: "local_shipping", permission: "manage_purchasing" as const },
+  { href: "/purchasing", label: "Purchasing", icon: "shopping_cart", permission: "manage_purchasing" as const },
+  { href: "/inventory", label: "Inventory", icon: "inventory_2", permission: "view_inventory" as const },
+  { href: "/waste", label: "Waste", icon: "delete_sweep", permission: "log_waste" as const },
+  { href: "/reports", label: "Reports", icon: "bar_chart", permission: "view_reports" as const },
+  { href: "/settings", label: "Settings", icon: "settings", permission: "manage_system" as const },
 ];
 
 export function Sidebar({ open, onClose }: SidebarProps) {
@@ -54,7 +38,6 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
   return (
     <>
-      {/* Overlay for mobile */}
       {open && (
         <div
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
@@ -62,30 +45,31 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-white border-r border-border transition-transform duration-200 lg:translate-x-0 lg:static lg:z-auto",
+          "fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-slate-50 border-r border-slate-200/60 transition-transform duration-200 lg:translate-x-0 lg:static lg:z-auto",
           open ? "translate-x-0" : "-translate-x-full"
         )}
       >
         {/* Logo */}
-        <div className="flex h-16 items-center justify-between border-b border-border px-4">
-          <Link href="/" className="flex items-center gap-2" onClick={onClose}>
-            <ChefHat className="h-7 w-7 text-primary" />
-            <span className="font-semibold text-lg">HFS Catering</span>
+        <div className="flex h-16 items-center justify-between px-5">
+          <Link href="/" className="flex items-center gap-2.5" onClick={onClose}>
+            <div className="w-9 h-9 bg-blue-700 rounded-xl flex items-center justify-center">
+              <span className="material-symbols-outlined text-white text-xl">restaurant</span>
+            </div>
+            <span className="font-bold text-base tracking-tight text-gray-900">HFS Catering</span>
           </Link>
           <button
             onClick={onClose}
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-accent lg:hidden"
+            className="rounded-lg p-1.5 text-gray-400 hover:bg-slate-200 lg:hidden"
           >
-            <X className="h-5 w-5" />
+            <span className="material-symbols-outlined text-xl">close</span>
           </button>
         </div>
 
         {/* Nav Links */}
         <nav className="flex-1 overflow-y-auto py-4 px-3">
-          <ul className="space-y-1">
+          <ul className="space-y-0.5">
             {filteredItems.map((item) => {
               const isActive =
                 pathname === item.href ||
@@ -97,13 +81,21 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                     href={item.href}
                     onClick={onClose}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                      "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium tracking-tight transition-all duration-150",
                       isActive
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                        ? "bg-blue-50 text-blue-700"
+                        : "text-gray-500 hover:bg-slate-100 hover:text-gray-700"
                     )}
                   >
-                    <item.icon className="h-5 w-5 flex-shrink-0" />
+                    <span
+                      className={cn(
+                        "material-symbols-outlined text-xl",
+                        isActive ? "text-blue-700" : "text-gray-400"
+                      )}
+                      style={isActive ? { fontVariationSettings: "'FILL' 1, 'wght' 500" } : undefined}
+                    >
+                      {item.icon}
+                    </span>
                     {item.label}
                   </Link>
                 </li>
@@ -114,18 +106,23 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
         {/* User & Sign Out */}
         {user && (
-          <div className="border-t border-border p-4">
-            <div className="mb-2">
-              <p className="text-sm font-medium truncate">{user.displayName || user.email}</p>
-              <p className="text-xs text-muted-foreground capitalize">
-                {user.role.replace("-", " ")}
-              </p>
+          <div className="border-t border-slate-200/60 p-4">
+            <div className="flex items-center gap-3 mb-3 px-1">
+              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                <span className="text-xs font-bold text-blue-700">
+                  {(user.displayName || user.email || "U").charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">{user.displayName || user.email}</p>
+                <p className="text-xs text-gray-400 capitalize">{user.role.replace("-", " ")}</p>
+              </div>
             </div>
             <button
               onClick={signOut}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-gray-400 hover:bg-red-50 hover:text-red-600 transition-all duration-150"
             >
-              <LogOut className="h-4 w-4" />
+              <span className="material-symbols-outlined text-xl">logout</span>
               Sign Out
             </button>
           </div>

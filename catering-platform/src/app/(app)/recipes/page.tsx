@@ -2,13 +2,9 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
-import { Plus, BookOpen, Search } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { LoadingScreen } from "@/components/layout/LoadingScreen";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -35,66 +31,80 @@ const CATEGORIES = [
   { value: "other", label: "Other" },
 ];
 
-const categoryColors: Record<string, string> = {
-  appetizer: "bg-amber-100 text-amber-800",
-  main: "bg-blue-100 text-blue-800",
-  side: "bg-green-100 text-green-800",
-  dessert: "bg-pink-100 text-pink-800",
-  sauce: "bg-orange-100 text-orange-800",
-  base: "bg-slate-100 text-slate-800",
-  marinade: "bg-purple-100 text-purple-800",
-  beverage: "bg-cyan-100 text-cyan-800",
-  bread: "bg-yellow-100 text-yellow-800",
-  salad: "bg-emerald-100 text-emerald-800",
-  soup: "bg-red-100 text-red-800",
-  other: "bg-gray-100 text-gray-800",
+const SORT_OPTIONS = [
+  { value: "name", label: "Name" },
+  { value: "cost-asc", label: "Cost: Low" },
+  { value: "cost-desc", label: "Cost: High" },
+  { value: "servings", label: "Servings" },
+];
+
+const categoryBadgeColors: Record<string, string> = {
+  appetizer: "bg-purple-600 text-white",
+  main: "bg-blue-600 text-white",
+  side: "bg-green-600 text-white",
+  dessert: "bg-red-600 text-white",
+  sauce: "bg-orange-600 text-white",
+  base: "bg-slate-600 text-white",
+  marinade: "bg-purple-600 text-white",
+  beverage: "bg-cyan-600 text-white",
+  bread: "bg-yellow-600 text-white",
+  salad: "bg-emerald-600 text-white",
+  soup: "bg-red-600 text-white",
+  other: "bg-gray-600 text-white",
 };
+
+const VISIBLE_COUNT = 9;
 
 export default function RecipesPage() {
   const { data: recipes, loading } = useRecipes();
-  const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("name");
+  const [showAll, setShowAll] = useState(false);
 
   const filtered = useMemo(() => {
     if (!recipes) return [];
-    return recipes.filter((r) => {
-      const matchesSearch = r.name
-        .toLowerCase()
-        .includes(search.toLowerCase());
-      const matchesCategory =
-        categoryFilter === "all" || r.category === categoryFilter;
-      return matchesSearch && matchesCategory;
+    let result = recipes.filter((r) => {
+      return categoryFilter === "all" || r.category === categoryFilter;
     });
-  }, [recipes, search, categoryFilter]);
+
+    result = [...result].sort((a, b) => {
+      switch (sortBy) {
+        case "cost-asc":
+          return a.totalRecipeCost - b.totalRecipeCost;
+        case "cost-desc":
+          return b.totalRecipeCost - a.totalRecipeCost;
+        case "servings":
+          return b.servings - a.servings;
+        default:
+          return a.name.localeCompare(b.name);
+      }
+    });
+
+    return result;
+  }, [recipes, categoryFilter, sortBy]);
+
+  const visible = showAll ? filtered : filtered.slice(0, VISIBLE_COUNT);
 
   if (loading) return <LoadingScreen />;
 
   return (
     <div>
       <PageHeader
-        title="Recipes"
-        description="Manage your recipe catalog and track costs"
+        title="Recipe Catalog"
+        description="Discover and manage your culinary creations"
         action={{
           label: "New Recipe",
           href: "/recipes/new",
-          icon: <Plus className="h-4 w-4" />,
+          icon: "add",
         }}
       />
 
       {recipes && recipes.length > 0 ? (
         <>
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search recipes..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
+          {/* Filter bar */}
+          <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center">
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectTrigger className="w-full sm:w-[200px] rounded-xl bg-white border">
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
@@ -105,23 +115,52 @@ export default function RecipesPage() {
                 ))}
               </SelectContent>
             </Select>
+
+            <div className="flex flex-wrap gap-2">
+              {SORT_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setSortBy(opt.value)}
+                  className={`px-4 py-2 rounded-full text-sm font-bold transition-all duration-150 ${
+                    sortBy === opt.value
+                      ? "bg-blue-700 text-white shadow-sm"
+                      : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {filtered.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
-              No recipes match your search.
+            <div className="py-12 text-center text-gray-500 font-medium">
+              No recipes match your filters.
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {filtered.map((recipe) => (
-                <RecipeCard key={recipe.id} recipe={recipe} />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {visible.map((recipe) => (
+                  <RecipeCard key={recipe.id} recipe={recipe} />
+                ))}
+              </div>
+
+              {filtered.length > VISIBLE_COUNT && !showAll && (
+                <div className="mt-10 flex justify-center">
+                  <button
+                    onClick={() => setShowAll(true)}
+                    className="bg-white rounded-xl border border-gray-200 px-6 py-3 font-bold text-blue-700 hover:bg-blue-50 transition-colors duration-150"
+                  >
+                    Show More Recipes
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </>
       ) : (
         <EmptyState
-          icon={<BookOpen className="h-12 w-12" />}
+          icon="menu_book"
           title="No recipes yet"
           description="Create your first recipe to start tracking ingredient costs and portion pricing."
           action={{
@@ -135,47 +174,51 @@ export default function RecipesPage() {
 }
 
 function RecipeCard({ recipe }: { recipe: Recipe }) {
-  const colorClass = categoryColors[recipe.category] || categoryColors.other;
+  const badgeColor = categoryBadgeColors[recipe.category] || categoryBadgeColors.other;
 
   return (
     <Link href={`/recipes/${recipe.id}`}>
-      <Card className="cursor-pointer transition-shadow hover:shadow-md">
-        <CardContent className="p-5">
-          <div className="mb-3 flex items-start justify-between">
-            <h3 className="text-base font-semibold text-foreground leading-tight line-clamp-2">
-              {recipe.name}
-            </h3>
-            <Badge variant="secondary" className={`ml-2 shrink-0 ${colorClass}`}>
-              {recipe.category}
-            </Badge>
+      <div className="bg-white rounded-2xl overflow-hidden ambient-shadow group cursor-pointer">
+        {/* Image area */}
+        <div className="h-48 bg-gray-200 relative overflow-hidden">
+          <div className="w-full h-full flex items-center justify-center group-hover:scale-105 transition-transform duration-500">
+            <span className="material-symbols-outlined text-gray-400 text-5xl">restaurant</span>
           </div>
+          <span className={`absolute top-3 left-3 rounded-full px-3 py-1 text-xs font-bold ${badgeColor}`}>
+            {recipe.category}
+          </span>
+        </div>
 
+        {/* Card body */}
+        <div className="p-5">
+          <h3 className="font-bold text-lg text-gray-900">{recipe.name}</h3>
           {recipe.description && (
-            <p className="mb-3 text-sm text-muted-foreground line-clamp-2">
+            <p className="text-sm text-gray-500 line-clamp-2 mt-1">
               {recipe.description}
             </p>
           )}
 
-          <div className="grid grid-cols-3 gap-2 border-t pt-3">
+          {/* Cost breakdown */}
+          <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-100">
             <div>
-              <p className="text-xs text-muted-foreground">Servings</p>
-              <p className="text-sm font-medium">{recipe.servings}</p>
+              <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Servings</p>
+              <p className="text-sm font-semibold text-gray-900 mt-0.5">{recipe.servings}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Per Serving</p>
-              <p className="text-sm font-medium">
+              <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Cost/Srv</p>
+              <p className="text-sm font-bold text-blue-700 mt-0.5">
                 {formatCurrency(recipe.costPerServing)}
               </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Total Cost</p>
-              <p className="text-sm font-medium">
+              <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Total Cost</p>
+              <p className="text-sm font-semibold text-gray-900 mt-0.5">
                 {formatCurrency(recipe.totalRecipeCost)}
               </p>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </Link>
   );
 }

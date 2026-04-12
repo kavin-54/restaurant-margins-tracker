@@ -2,27 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Material Symbols Outlined */
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
+
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 224 71% 4%;
+    --foreground: 195 10% 19%;
     --card: 0 0% 100%;
-    --card-foreground: 224 71% 4%;
+    --card-foreground: 195 10% 19%;
     --popover: 0 0% 100%;
-    --popover-foreground: 224 71% 4%;
-    --primary: 220 70% 50%;
-    --primary-foreground: 210 20% 98%;
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 220 9% 46%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
-    --accent: 220 14% 96%;
-    --accent-foreground: 220 9% 46%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 20% 98%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 220 70% 50%;
+    --popover-foreground: 195 10% 19%;
+    --primary: 211 100% 39%;
+    --primary-foreground: 240 33% 99%;
+    --secondary: 222 14% 39%;
+    --secondary-foreground: 240 33% 99%;
+    --muted: 200 10% 94%;
+    --muted-foreground: 192 5% 37%;
+    --accent: 200 10% 94%;
+    --accent-foreground: 195 10% 19%;
+    --destructive: 1 53% 44%;
+    --destructive-foreground: 0 100% 98%;
+    --border: 195 5% 71%;
+    --input: 195 5% 71%;
+    --ring: 211 100% 39%;
     --radius: 0.5rem;
   }
 }
@@ -33,6 +36,35 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+}
+
+@layer components {
+  .ambient-shadow {
+    box-shadow: 0px 10px 40px rgba(45, 51, 53, 0.06);
+  }
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+  }
+  .stitch-card {
+    @apply bg-white rounded-2xl border border-gray-100 ambient-shadow;
+  }
+  .stitch-input {
+    @apply w-full h-12 px-4 rounded-lg bg-gray-50 border-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white text-gray-800 transition-all duration-200;
+  }
+  .stitch-btn-primary {
+    @apply h-12 bg-gradient-to-r from-blue-700 to-blue-900 text-white font-bold rounded-lg shadow-sm hover:shadow-md active:scale-95 transition-all duration-150 flex items-center justify-center gap-2 px-6;
+  }
+  .stitch-btn-outline {
+    @apply h-12 border-2 border-blue-700 text-blue-700 font-bold rounded-lg hover:bg-blue-50 active:scale-95 transition-all duration-150 flex items-center justify-center gap-2 px-6;
+  }
+  .stitch-badge {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider;
   }
 }
 

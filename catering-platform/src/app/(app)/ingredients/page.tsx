@@ -2,32 +2,15 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
-import { Plus, Search, Egg } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { LoadingScreen } from "@/components/layout/LoadingScreen";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { useIngredients } from "@/lib/hooks/useIngredients";
+import { useIngredients, deleteIngredient } from "@/lib/hooks/useIngredients";
 import { formatCurrency } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
 
 const CATEGORIES = [
-  { value: "protein", label: "Protein" },
+  { value: "protein", label: "Meat / Protein" },
   { value: "produce", label: "Produce" },
   { value: "dairy", label: "Dairy" },
   { value: "dry-goods", label: "Dry Goods" },
@@ -41,126 +24,307 @@ const CATEGORIES = [
   { value: "other", label: "Other" },
 ];
 
+const SORT_OPTIONS = [
+  { value: "name-asc", label: "Name A-Z" },
+  { value: "name-desc", label: "Name Z-A" },
+  { value: "cost-asc", label: "Cost: Low to High" },
+  { value: "cost-desc", label: "Cost: High to Low" },
+  { value: "category", label: "Category" },
+];
+
 function getCategoryLabel(value: string): string {
   return CATEGORIES.find((c) => c.value === value)?.label ?? value;
 }
 
+function getCategoryBadgeClasses(category: string): string {
+  switch (category) {
+    case "produce":
+      return "bg-green-100 text-green-700";
+    case "dairy":
+      return "bg-blue-100 text-blue-700";
+    case "dry-goods":
+      return "bg-purple-100 text-purple-700";
+    case "protein":
+      return "bg-red-100 text-red-700";
+    case "spice":
+      return "bg-amber-100 text-amber-700";
+    case "grain-starch":
+      return "bg-orange-100 text-orange-700";
+    case "oil-fat":
+      return "bg-yellow-100 text-yellow-700";
+    case "condiment":
+      return "bg-teal-100 text-teal-700";
+    case "beverage":
+      return "bg-cyan-100 text-cyan-700";
+    case "disposable":
+    case "packaging":
+      return "bg-gray-100 text-gray-700";
+    default:
+      return "bg-gray-100 text-gray-600";
+  }
+}
+
+const ITEMS_PER_PAGE = 15;
+
 export default function IngredientsPage() {
   const { data: ingredients, loading, error } = useIngredients();
-  const [search, setSearch] = useState("");
+  const { toast } = useToast();
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("name-asc");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const filtered = useMemo(() => {
     if (!ingredients) return [];
-    return ingredients.filter((ing) => {
-      const matchesSearch = ing.name
-        .toLowerCase()
-        .includes(search.toLowerCase());
+
+    let result = ingredients.filter((ing) => {
       const matchesCategory =
         categoryFilter === "all" || ing.category === categoryFilter;
-      return matchesSearch && matchesCategory;
+      return matchesCategory;
     });
-  }, [ingredients, search, categoryFilter]);
+
+    // Sort
+    result = [...result].sort((a, b) => {
+      switch (sortBy) {
+        case "name-asc":
+          return a.name.localeCompare(b.name);
+        case "name-desc":
+          return b.name.localeCompare(a.name);
+        case "cost-asc":
+          return a.costPerUnit - b.costPerUnit;
+        case "cost-desc":
+          return b.costPerUnit - a.costPerUnit;
+        case "category":
+          return a.category.localeCompare(b.category);
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [ingredients, categoryFilter, sortBy]);
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const paginatedItems = filtered.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  async function handleDelete(e: React.MouseEvent, id: string, name: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm(`Delete "${name}"? This action cannot be undone.`)) return;
+    try {
+      await deleteIngredient(id);
+      toast({ title: "Deleted", description: `${name} has been removed.` });
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to delete ingredient.",
+        variant: "destructive",
+      });
+    }
+  }
 
   if (loading) return <LoadingScreen />;
   if (error) {
     return (
-      <div className="p-6 text-destructive">
+      <div className="p-6 text-red-600">
         Failed to load ingredients. Please try again.
       </div>
     );
   }
 
   return (
-    <div className="p-6">
+    <div>
       <PageHeader
         title="Ingredients"
-        description="Manage your ingredient catalog and costs"
+        description="Master your ingredient catalog"
         action={{
           label: "Add Ingredient",
           href: "/ingredients/new",
-          icon: <Plus className="h-4 w-4" />,
+          icon: "add",
         }}
       />
 
       {ingredients && ingredients.length > 0 ? (
         <>
-          <div className="flex flex-col sm:flex-row gap-3 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search ingredients..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full sm:w-[200px]">
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {CATEGORIES.map((cat) => (
-                  <SelectItem key={cat.value} value={cat.value}>
-                    {cat.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Filter Bar */}
+          <div className="flex items-center gap-3 mb-6">
+            <select
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="h-10 px-4 bg-gray-50 border-0 rounded-lg text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            >
+              <option value="all">All Categories</option>
+              {CATEGORIES.map((cat) => (
+                <option key={cat.value} value={cat.value}>
+                  {cat.label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="h-10 px-4 bg-gray-50 border-0 rounded-lg text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           {filtered.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              No ingredients match your search.
+            <div className="text-center py-12 text-gray-400 font-medium">
+              No ingredients match your filters.
             </div>
           ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Unit</TableHead>
-                    <TableHead className="text-right">Cost/Unit</TableHead>
-                    <TableHead>Supplier</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((ing) => (
-                    <TableRow key={ing.id} className="cursor-pointer">
-                      <TableCell>
-                        <Link
-                          href={`/ingredients/${ing.id}`}
-                          className="block font-medium text-foreground hover:underline"
+            <>
+              {/* Data Table */}
+              <div className="bg-white rounded-2xl ambient-shadow overflow-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gray-50/50">
+                      <th className="text-left px-6 py-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                        Name
+                      </th>
+                      <th className="text-left px-6 py-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                        Category
+                      </th>
+                      <th className="text-left px-6 py-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                        Unit
+                      </th>
+                      <th className="text-left px-6 py-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                        Cost/Unit
+                      </th>
+                      <th className="text-left px-6 py-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                        Supplier
+                      </th>
+                      <th className="text-right px-6 py-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {paginatedItems.map((ing) => (
+                      <tr
+                        key={ing.id}
+                        className="group hover:bg-gray-50 transition cursor-pointer"
+                      >
+                        <td className="px-6 py-4">
+                          <Link
+                            href={`/ingredients/${ing.id}`}
+                            className="flex items-center gap-3"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-gray-100 flex-shrink-0" />
+                            <span className="text-sm font-semibold text-gray-900">
+                              {ing.name}
+                            </span>
+                          </Link>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${getCategoryBadgeClasses(ing.category)}`}
+                          >
+                            {getCategoryLabel(ing.category)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {ing.unit}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-blue-700 font-bold">
+                          {formatCurrency(ing.costPerUnit)}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {ing.supplier || "\u2014"}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition">
+                            <Link
+                              href={`/ingredients/${ing.id}`}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition"
+                            >
+                              <span className="material-symbols-outlined text-lg">
+                                edit
+                              </span>
+                            </Link>
+                            <button
+                              onClick={(e) => handleDelete(e, ing.id, ing.name)}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                            >
+                              <span className="material-symbols-outlined text-lg">
+                                delete
+                              </span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Footer */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 px-2">
+                  <p className="text-sm text-gray-400 font-medium">
+                    Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}
+                    {"\u2013"}
+                    {Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} of{" "}
+                    {filtered.length} ingredients
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() =>
+                        setCurrentPage((p) => Math.max(1, p - 1))
+                      }
+                      disabled={currentPage === 1}
+                      className="w-9 h-9 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <span className="material-symbols-outlined text-lg">
+                        chevron_left
+                      </span>
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                      (page) => (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`w-9 h-9 rounded-lg text-sm font-semibold transition ${
+                            page === currentPage
+                              ? "bg-blue-700 text-white"
+                              : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                          }`}
                         >
-                          {ing.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">
-                          {getCategoryLabel(ing.category)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {ing.unit}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(ing.costPerUnit)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {ing.supplier || "—"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                          {page}
+                        </button>
+                      )
+                    )}
+                    <button
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
+                      disabled={currentPage === totalPages}
+                      className="w-9 h-9 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <span className="material-symbols-outlined text-lg">
+                        chevron_right
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </>
       ) : (
         <EmptyState
-          icon={<Egg className="h-12 w-12" />}
+          icon="egg_alt"
           title="No ingredients yet"
           description="Add your first ingredient to start tracking costs and building recipes."
           action={{ label: "Add Ingredient", href: "/ingredients/new" }}

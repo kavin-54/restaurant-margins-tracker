@@ -1,20 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Settings, Save } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LoadingScreen } from "@/components/layout/LoadingScreen";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import {
   useSystemConfig,
   updateSystemConfig,
-  SystemConfig,
 } from "@/lib/hooks/useSystemConfig";
-import { addDocument } from "@/lib/firebase/firestore";
 
 const DEFAULT_CONFIG = {
   businessName: "",
@@ -30,7 +23,7 @@ const DEFAULT_CONFIG = {
 };
 
 export default function SettingsPage() {
-  const { data: config, loading, error } = useSystemConfig();
+  const { data: config, loading } = useSystemConfig();
   const { toast } = useToast();
 
   const [form, setForm] = useState(DEFAULT_CONFIG);
@@ -57,7 +50,6 @@ export default function SettingsPage() {
       });
       setInitialized(true);
     } else if (!loading && !config && !initialized) {
-      // Config doesn't exist yet, use defaults
       setInitialized(true);
     }
   }, [config, loading, initialized]);
@@ -72,7 +64,6 @@ export default function SettingsPage() {
 
     try {
       if (config) {
-        // Update existing config
         await updateSystemConfig({
           businessName: form.businessName,
           contactEmail: form.contactEmail,
@@ -86,7 +77,6 @@ export default function SettingsPage() {
           timezone: form.timezone,
         });
       } else {
-        // Create initial config document with "default" id
         const { setDoc, doc } = await import("firebase/firestore");
         const { db } = await import("@/lib/firebase/config");
         await setDoc(doc(db, "systemConfig", "default"), {
@@ -118,208 +108,182 @@ export default function SettingsPage() {
   if (loading) return <LoadingScreen />;
 
   return (
-    <div className="p-6">
+    <div>
       <PageHeader
         title="Settings"
-        description="Configure your catering platform preferences"
+        description="System configuration and preferences"
       />
 
-      <form onSubmit={handleSave}>
-        <Card className="max-w-2xl">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5" />
-              Business Configuration
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Business Info */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                Business Info
-              </h3>
+      <form onSubmit={handleSave} className="max-w-2xl space-y-6">
+        {/* Business Info */}
+        <div className="bg-white rounded-2xl ambient-shadow p-6">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+              <span className="material-symbols-outlined text-blue-600 text-xl">business</span>
+            </div>
+            <h2 className="text-sm font-bold text-gray-900">Business Info</h2>
+          </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="businessName">Business Name</Label>
-                <Input
-                  id="businessName"
-                  placeholder="Your Catering Company"
-                  value={form.businessName}
-                  onChange={(e) => updateField("businessName", e.target.value)}
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Business Name</label>
+              <input
+                placeholder="Your Catering Company"
+                value={form.businessName}
+                onChange={(e) => updateField("businessName", e.target.value)}
+                className="w-full bg-gray-50 border-none h-12 rounded-lg px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Contact Email</label>
+                <input
+                  type="email"
+                  placeholder="info@example.com"
+                  value={form.contactEmail}
+                  onChange={(e) => updateField("contactEmail", e.target.value)}
+                  className="w-full bg-gray-50 border-none h-12 rounded-lg px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                 />
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="contactEmail">Contact Email</Label>
-                  <Input
-                    id="contactEmail"
-                    type="email"
-                    placeholder="info@example.com"
-                    value={form.contactEmail}
-                    onChange={(e) =>
-                      updateField("contactEmail", e.target.value)
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="contactPhone">Contact Phone</Label>
-                  <Input
-                    id="contactPhone"
-                    type="tel"
-                    placeholder="(555) 123-4567"
-                    value={form.contactPhone}
-                    onChange={(e) =>
-                      updateField("contactPhone", e.target.value)
-                    }
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Contact Phone</label>
+                <input
+                  type="tel"
+                  placeholder="(555) 123-4567"
+                  value={form.contactPhone}
+                  onChange={(e) => updateField("contactPhone", e.target.value)}
+                  className="w-full bg-gray-50 border-none h-12 rounded-lg px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                />
               </div>
             </div>
+          </div>
+        </div>
 
-            {/* Divider */}
-            <div className="border-t" />
-
-            {/* Financial Defaults */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                Financial Defaults
-              </h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="taxRate">Tax Rate (%)</Label>
-                  <Input
-                    id="taxRate"
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    max="100"
-                    value={form.taxRate}
-                    onChange={(e) => updateField("taxRate", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="defaultMarkupPercentage">
-                    Default Markup (%)
-                  </Label>
-                  <Input
-                    id="defaultMarkupPercentage"
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    value={form.defaultMarkupPercentage}
-                    onChange={(e) =>
-                      updateField("defaultMarkupPercentage", e.target.value)
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="defaultMinMarginPercentage">
-                    Min Margin (%)
-                  </Label>
-                  <Input
-                    id="defaultMinMarginPercentage"
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    value={form.defaultMinMarginPercentage}
-                    onChange={(e) =>
-                      updateField("defaultMinMarginPercentage", e.target.value)
-                    }
-                  />
-                </div>
-              </div>
+        {/* Financial Defaults */}
+        <div className="bg-white rounded-2xl ambient-shadow p-6">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
+              <span className="material-symbols-outlined text-green-600 text-xl">payments</span>
             </div>
+            <h2 className="text-sm font-bold text-gray-900">Financial Defaults</h2>
+          </div>
 
-            {/* Divider */}
-            <div className="border-t" />
-
-            {/* Labor & Operations */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                Labor & Operations
-              </h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="laborCostPerHour">
-                    Labor Cost per Hour ($)
-                  </Label>
-                  <Input
-                    id="laborCostPerHour"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={form.laborCostPerHour}
-                    onChange={(e) =>
-                      updateField("laborCostPerHour", e.target.value)
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="prepTimeMinutesPerServing">
-                    Prep Time per Serving (min)
-                  </Label>
-                  <Input
-                    id="prepTimeMinutesPerServing"
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    value={form.prepTimeMinutesPerServing}
-                    onChange={(e) =>
-                      updateField("prepTimeMinutesPerServing", e.target.value)
-                    }
-                  />
-                </div>
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Tax Rate (%)</label>
+              <input
+                type="number"
+                step="0.001"
+                min="0"
+                max="100"
+                value={form.taxRate}
+                onChange={(e) => updateField("taxRate", e.target.value)}
+                className="w-full bg-gray-50 border-none h-12 rounded-lg px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+              />
             </div>
-
-            {/* Divider */}
-            <div className="border-t" />
-
-            {/* Locale */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                Locale
-              </h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="currency">Currency</Label>
-                  <Input
-                    id="currency"
-                    placeholder="USD"
-                    value={form.currency}
-                    onChange={(e) => updateField("currency", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="timezone">Timezone</Label>
-                  <Input
-                    id="timezone"
-                    placeholder="America/New_York"
-                    value={form.timezone}
-                    onChange={(e) => updateField("timezone", e.target.value)}
-                  />
-                </div>
-              </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Default Markup (%)</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={form.defaultMarkupPercentage}
+                onChange={(e) => updateField("defaultMarkupPercentage", e.target.value)}
+                className="w-full bg-gray-50 border-none h-12 rounded-lg px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+              />
             </div>
-
-            {/* Save Button */}
-            <div className="pt-2">
-              <Button
-                type="submit"
-                size="lg"
-                disabled={saving}
-                className="w-full sm:w-auto gap-2"
-              >
-                <Save className="h-4 w-4" />
-                {saving ? "Saving..." : "Save Settings"}
-              </Button>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Min Margin (%)</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={form.defaultMinMarginPercentage}
+                onChange={(e) => updateField("defaultMinMarginPercentage", e.target.value)}
+                className="w-full bg-gray-50 border-none h-12 rounded-lg px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+              />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+
+        {/* Labor & Operations */}
+        <div className="bg-white rounded-2xl ambient-shadow p-6">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
+              <span className="material-symbols-outlined text-amber-600 text-xl">schedule</span>
+            </div>
+            <h2 className="text-sm font-bold text-gray-900">Labor & Operations</h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Labor Cost per Hour ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.laborCostPerHour}
+                onChange={(e) => updateField("laborCostPerHour", e.target.value)}
+                className="w-full bg-gray-50 border-none h-12 rounded-lg px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Prep Time per Serving (min)</label>
+              <input
+                type="number"
+                step="0.5"
+                min="0"
+                value={form.prepTimeMinutesPerServing}
+                onChange={(e) => updateField("prepTimeMinutesPerServing", e.target.value)}
+                className="w-full bg-gray-50 border-none h-12 rounded-lg px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Locale */}
+        <div className="bg-white rounded-2xl ambient-shadow p-6">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
+              <span className="material-symbols-outlined text-purple-600 text-xl">language</span>
+            </div>
+            <h2 className="text-sm font-bold text-gray-900">Locale</h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Currency</label>
+              <input
+                placeholder="USD"
+                value={form.currency}
+                onChange={(e) => updateField("currency", e.target.value)}
+                className="w-full bg-gray-50 border-none h-12 rounded-lg px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Timezone</label>
+              <input
+                placeholder="America/New_York"
+                value={form.timezone}
+                onChange={(e) => updateField("timezone", e.target.value)}
+                className="w-full bg-gray-50 border-none h-12 rounded-lg px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Save Button */}
+        <div className="pt-2">
+          <button
+            type="submit"
+            disabled={saving}
+            className="h-12 px-8 bg-gradient-to-r from-blue-700 to-blue-900 text-white text-sm font-bold rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            <span className="material-symbols-outlined text-lg">save</span>
+            {saving ? "Saving..." : "Save Settings"}
+          </button>
+        </div>
       </form>
     </div>
   );
