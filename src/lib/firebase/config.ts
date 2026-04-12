@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -23,9 +23,15 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 console.timeEnd("[Firebase] App init");
 
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// Use experimentalAutoDetectLongPolling to fix WebSocket connectivity issues on Vercel
+export const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+});
+
 export const storage = getStorage(app);
 
-console.log("[Firebase] Auth, Firestore, Storage initialized");
+console.log("[Firebase] Auth, Firestore (long-polling), Storage initialized");
 
 export default app;
