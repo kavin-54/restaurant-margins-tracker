@@ -38,30 +38,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("[AuthProvider] Auth state received, user:", firebaseUser ? firebaseUser.uid : "null");
 
       if (firebaseUser) {
+        // Build fallback user immediately from Firebase Auth
+        const fallbackUser: AppUser = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || "",
+          displayName: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "",
+          role: "admin",
+        };
+
+        // Try to fetch Firestore user doc with a 1.5s timeout
         try {
           console.time("[AuthProvider] Firestore user doc fetch");
-          const userDoc = await getDocument<AppUser>("users", firebaseUser.uid);
+          const userDocPromise = getDocument<AppUser>("users", firebaseUser.uid);
+          const timeoutPromise = new Promise<null>((_, reject) =>
+            setTimeout(() => reject(new Error("Firestore user doc fetch timeout (1.5s)")), 1500)
+          );
+          const userDoc = await Promise.race([userDocPromise, timeoutPromise]);
           console.timeEnd("[AuthProvider] Firestore user doc fetch");
           if (userDoc) {
             console.log("[AuthProvider] User doc found:", userDoc.role);
             setUser(userDoc);
           } else {
             console.log("[AuthProvider] No user doc, using fallback from Firebase Auth");
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email || "",
-              displayName: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "",
-              role: "admin",
-            });
+            setUser(fallbackUser);
           }
         } catch (error) {
-          console.error("[AuthProvider] Error fetching user document:", error);
-          setUser({
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || "",
-            displayName: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "",
-            role: "admin",
-          });
+          console.warn("[AuthProvider] User doc fetch failed/timed out, using fallback:", error);
+          setUser(fallbackUser);
         }
       } else {
         console.log("[AuthProvider] No user, redirecting to /login");
