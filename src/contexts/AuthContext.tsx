@@ -38,43 +38,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("[AuthProvider] Auth state received, user:", firebaseUser ? firebaseUser.uid : "null");
 
       if (firebaseUser) {
-        // Build fallback user immediately from Firebase Auth
-        const fallbackUser: AppUser = {
+        // Set user IMMEDIATELY from Firebase Auth — don't block on Firestore
+        const authUser: AppUser = {
           uid: firebaseUser.uid,
           email: firebaseUser.email || "",
           displayName: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "",
           role: "admin",
         };
+        setUser(authUser);
+        setLoading(false);
+        console.timeEnd("[AuthProvider] total auth resolution");
 
-        // Try to fetch Firestore user doc with a 1.5s timeout
-        try {
-          console.time("[AuthProvider] Firestore user doc fetch");
-          const userDocPromise = getDocument<AppUser>("users", firebaseUser.uid);
-          const timeoutPromise = new Promise<null>((_, reject) =>
-            setTimeout(() => reject(new Error("Firestore user doc fetch timeout (1.5s)")), 1500)
-          );
-          const userDoc = await Promise.race([userDocPromise, timeoutPromise]);
-          console.timeEnd("[AuthProvider] Firestore user doc fetch");
-          if (userDoc) {
-            console.log("[AuthProvider] User doc found:", userDoc.role);
-            setUser(userDoc);
-          } else {
-            console.log("[AuthProvider] No user doc, using fallback from Firebase Auth");
-            setUser(fallbackUser);
-          }
-        } catch (error) {
-          console.warn("[AuthProvider] User doc fetch failed/timed out, using fallback:", error);
-          setUser(fallbackUser);
-        }
+        // Fetch Firestore user doc in the background to get real role
+        getDocument<AppUser>("users", firebaseUser.uid)
+          .then((userDoc) => {
+            if (userDoc) {
+              console.log("[AuthProvider] Background: user doc found, role:", userDoc.role);
+              setUser(userDoc);
+            }
+          })
+          .catch((err) => {
+            console.warn("[AuthProvider] Background: user doc fetch failed:", err);
+          });
       } else {
         console.log("[AuthProvider] No user, redirecting to /login");
         setUser(null);
+        setLoading(false);
+        console.timeEnd("[AuthProvider] total auth resolution");
         if (pathname !== "/login") {
           router.push("/login");
         }
       }
-      console.timeEnd("[AuthProvider] total auth resolution");
-      setLoading(false);
     });
 
     return () => {
