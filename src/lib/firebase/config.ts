@@ -13,13 +13,19 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
+console.log("[Firebase] Initializing with project:", firebaseConfig.projectId);
+console.log("[Firebase] Auth domain:", firebaseConfig.authDomain);
+console.time("[Firebase] App init");
+
 // Initialize Firebase (prevent re-initialization in dev hot reload)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+
+console.timeEnd("[Firebase] App init");
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
-// Offline persistence is enabled by default in Firebase v9+ SDK
+console.log("[Firebase] Auth, Firestore, Storage initialized");
 
 export default app;

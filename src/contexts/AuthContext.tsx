@@ -22,23 +22,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
+    console.log("[AuthProvider] useEffect running, pathname:", pathname);
+    console.time("[AuthProvider] total auth resolution");
     let timeout: NodeJS.Timeout;
 
     // Safety timeout — if Firebase Auth doesn't respond in 1 second, stop loading
     timeout = setTimeout(() => {
+      console.warn("[AuthProvider] TIMEOUT: Auth did not respond within 1s, forcing load");
+      console.timeEnd("[AuthProvider] total auth resolution");
       setLoading(false);
     }, 1000);
 
     const unsubscribe = onAuthChange(async (firebaseUser: User | null) => {
       clearTimeout(timeout);
+      console.log("[AuthProvider] Auth state received, user:", firebaseUser ? firebaseUser.uid : "null");
 
       if (firebaseUser) {
         try {
+          console.time("[AuthProvider] Firestore user doc fetch");
           const userDoc = await getDocument<AppUser>("users", firebaseUser.uid);
+          console.timeEnd("[AuthProvider] Firestore user doc fetch");
           if (userDoc) {
+            console.log("[AuthProvider] User doc found:", userDoc.role);
             setUser(userDoc);
           } else {
-            // Fallback if user document doesn't exist yet
+            console.log("[AuthProvider] No user doc, using fallback from Firebase Auth");
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email || "",
@@ -47,8 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             });
           }
         } catch (error) {
-          console.error("Error fetching user document:", error);
-          // Still set user from Firebase Auth data so they're not blocked
+          console.error("[AuthProvider] Error fetching user document:", error);
           setUser({
             uid: firebaseUser.uid,
             email: firebaseUser.email || "",
@@ -57,11 +64,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
         }
       } else {
+        console.log("[AuthProvider] No user, redirecting to /login");
         setUser(null);
         if (pathname !== "/login") {
           router.push("/login");
         }
       }
+      console.timeEnd("[AuthProvider] total auth resolution");
       setLoading(false);
     });
 
@@ -88,14 +97,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut: handleSignOut,
   };
 
-  // Show loading spinner briefly, then render children
   if (loading) {
     return (
       <AuthContext.Provider value={value}>
-        <div className="flex h-screen items-center justify-center bg-gray-50">
+        <div className="flex h-screen items-center justify-center bg-[#f8f9fa]">
           <div className="text-center">
-            <div className="h-8 w-8 mx-auto mb-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="text-sm text-muted-foreground">Loading...</p>
+            <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center animate-pulse mx-auto mb-3">
+              <span className="material-symbols-outlined text-blue-600 text-2xl">restaurant</span>
+            </div>
+            <p className="text-sm font-medium text-gray-400 tracking-wide">Loading...</p>
           </div>
         </div>
       </AuthContext.Provider>

@@ -25,8 +25,12 @@ export function useCollection<T>(
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    console.log(`[Firestore] useCollection("${collectionPath}") subscribing`);
+    console.time(`[Firestore] useCollection("${collectionPath}") first snapshot`);
+
     // Safety timeout — stop loading after 2 seconds even if Firestore hasn't responded
     const timeout = setTimeout(() => {
+      console.warn(`[Firestore] useCollection("${collectionPath}") TIMEOUT: no response in 2s`);
       setLoading(false);
     }, 2000);
 
@@ -40,14 +44,17 @@ export function useCollection<T>(
         q,
         (snapshot) => {
           clearTimeout(timeout);
+          console.timeEnd(`[Firestore] useCollection("${collectionPath}") first snapshot`);
           try {
             const docs = snapshot.docs.map((d) => ({
               id: d.id,
               ...d.data(),
             } as T));
+            console.log(`[Firestore] useCollection("${collectionPath}") got ${docs.length} docs`);
             setData(docs);
             setError(null);
           } catch (err) {
+            console.error(`[Firestore] useCollection("${collectionPath}") parse error:`, err);
             setError(err instanceof Error ? err : new Error(String(err)));
           } finally {
             setLoading(false);
@@ -55,14 +62,14 @@ export function useCollection<T>(
         },
         (err) => {
           clearTimeout(timeout);
-          console.warn(`Firestore error on ${collectionPath}:`, err.message);
+          console.error(`[Firestore] useCollection("${collectionPath}") error:`, err.code, err.message);
           setError(err instanceof Error ? err : new Error(String(err)));
           setLoading(false);
         }
       );
     } catch (err) {
       clearTimeout(timeout);
-      console.warn(`Failed to set up listener for ${collectionPath}:`, err);
+      console.error(`[Firestore] useCollection("${collectionPath}") setup failed:`, err);
       setError(err instanceof Error ? err : new Error(String(err)));
       setLoading(false);
       return;
@@ -92,8 +99,12 @@ export function useDocument<T>(
       return;
     }
 
+    console.log(`[Firestore] useDocument("${collectionPath}/${docId}") subscribing`);
+    console.time(`[Firestore] useDocument("${collectionPath}/${docId}") first snapshot`);
+
     // Safety timeout
     const timeout = setTimeout(() => {
+      console.warn(`[Firestore] useDocument("${collectionPath}/${docId}") TIMEOUT: no response in 2s`);
       setLoading(false);
     }, 2000);
 
@@ -106,17 +117,21 @@ export function useDocument<T>(
         docRef,
         (snapshot) => {
           clearTimeout(timeout);
+          console.timeEnd(`[Firestore] useDocument("${collectionPath}/${docId}") first snapshot`);
           try {
             if (snapshot.exists()) {
+              console.log(`[Firestore] useDocument("${collectionPath}/${docId}") doc found`);
               setData({
                 id: snapshot.id,
                 ...snapshot.data(),
               } as T);
             } else {
+              console.log(`[Firestore] useDocument("${collectionPath}/${docId}") doc not found`);
               setData(null);
             }
             setError(null);
           } catch (err) {
+            console.error(`[Firestore] useDocument("${collectionPath}/${docId}") parse error:`, err);
             setError(err instanceof Error ? err : new Error(String(err)));
           } finally {
             setLoading(false);
@@ -124,14 +139,14 @@ export function useDocument<T>(
         },
         (err) => {
           clearTimeout(timeout);
-          console.warn(`Firestore error on ${collectionPath}/${docId}:`, err.message);
+          console.error(`[Firestore] useDocument("${collectionPath}/${docId}") error:`, err.code, err.message);
           setError(err instanceof Error ? err : new Error(String(err)));
           setLoading(false);
         }
       );
     } catch (err) {
       clearTimeout(timeout);
-      console.warn(`Failed to set up listener for ${collectionPath}/${docId}:`, err);
+      console.error(`[Firestore] useDocument("${collectionPath}/${docId}") setup failed:`, err);
       setError(err instanceof Error ? err : new Error(String(err)));
       setLoading(false);
       return;
