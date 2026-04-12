@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
+import { getFirestore, initializeFirestore, Firestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -24,14 +24,22 @@ console.timeEnd("[Firebase] App init");
 
 export const auth = getAuth(app);
 
-// Use experimentalAutoDetectLongPolling to fix WebSocket connectivity issues on Vercel
-export const db = initializeFirestore(app, {
-  experimentalAutoDetectLongPolling: true,
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-});
+// Initialize Firestore — use getFirestore on re-init (hot reload), initializeFirestore on first init
+let db: Firestore;
+try {
+  db = initializeFirestore(app, {
+    experimentalAutoDetectLongPolling: true,
+  });
+  console.log("[Firebase] Firestore initialized with long-polling");
+} catch {
+  // Already initialized (hot reload) — just get the existing instance
+  db = getFirestore(app);
+  console.log("[Firebase] Firestore re-used existing instance");
+}
+export { db };
 
 export const storage = getStorage(app);
 
-console.log("[Firebase] Auth, Firestore (long-polling), Storage initialized");
+console.log("[Firebase] Auth, Firestore, Storage ready");
 
 export default app;
