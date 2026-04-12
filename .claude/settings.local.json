@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(brew install:*)",
+      "Bash(vercel login:*)",
+      "Bash(gh auth:*)",
+      "Bash(firebase --version)",
+      "Bash(firebase login:*)",
+      "Bash(firebase projects:list)",
+      "Bash(firebase init:*)",
+      "Bash(firebase use:*)",
+      "Bash(firebase apps:list --project resteraunt-margins-tracker)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}
