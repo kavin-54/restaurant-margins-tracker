@@ -24,10 +24,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let timeout: NodeJS.Timeout;
 
-    // Safety timeout — if Firebase Auth doesn't respond in 3 seconds, stop loading
+    // Safety timeout — if Firebase Auth doesn't respond in 1 second, stop loading
     timeout = setTimeout(() => {
       setLoading(false);
-    }, 3000);
+    }, 1000);
 
     const unsubscribe = onAuthChange(async (firebaseUser: User | null) => {
       clearTimeout(timeout);

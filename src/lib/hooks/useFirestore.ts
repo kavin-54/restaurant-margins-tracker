@@ -25,10 +25,10 @@ export function useCollection<T>(
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    // Safety timeout — stop loading after 5 seconds even if Firestore hasn't responded
+    // Safety timeout — stop loading after 2 seconds even if Firestore hasn't responded
     const timeout = setTimeout(() => {
       setLoading(false);
-    }, 5000);
+    }, 2000);
 
     let unsubscribe: () => void;
 
@@ -95,7 +95,7 @@ export function useDocument<T>(
     // Safety timeout
     const timeout = setTimeout(() => {
       setLoading(false);
-    }, 5000);
+    }, 2000);
 
     let unsubscribe: () => void;
 
