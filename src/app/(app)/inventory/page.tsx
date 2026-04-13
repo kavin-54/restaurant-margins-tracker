@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useCallback } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { LoadingScreen } from "@/components/layout/LoadingScreen";
@@ -74,6 +74,12 @@ export default function InventoryPage() {
   const [adjustmentNotes, setAdjustmentNotes] = useState("");
   const [adjusting, setAdjusting] = useState(false);
 
+  // Quick Count mode state
+  const [quickCountMode, setQuickCountMode] = useState(false);
+  const [quickCounts, setQuickCounts] = useState<Record<string, string>>({});
+  const [savingCounts, setSavingCounts] = useState(false);
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
   const filtered = useMemo(() => {
     if (!inventory) return [];
     if (!search) return inventory;
@@ -95,6 +101,77 @@ export default function InventoryPage() {
       ),
     };
   }, [inventory]);
+
+  // Quick Count helpers
+  const changedItems = useMemo(() => {
+    if (!inventory) return [];
+    return inventory.filter((item) => {
+      const newVal = quickCounts[item.id];
+      if (newVal === undefined || newVal === "") return false;
+      const parsed = parseFloat(newVal);
+      return !isNaN(parsed) && parsed !== item.currentQuantity;
+    });
+  }, [inventory, quickCounts]);
+
+  const handleQuickCountChange = useCallback((id: string, value: string) => {
+    setQuickCounts((prev) => ({ ...prev, [id]: value }));
+  }, []);
+
+  const handleQuickCountKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>, currentIndex: number) => {
+      if (e.key === "Tab" || e.key === "Enter") {
+        e.preventDefault();
+        const nextIndex = currentIndex + 1;
+        if (filtered[nextIndex]) {
+          const nextId = filtered[nextIndex].id;
+          inputRefs.current[nextId]?.focus();
+          inputRefs.current[nextId]?.select();
+        }
+      }
+    },
+    [filtered]
+  );
+
+  async function handleSaveAllCounts() {
+    if (changedItems.length === 0) return;
+    setSavingCounts(true);
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const item of changedItems) {
+      const newQty = parseFloat(quickCounts[item.id]);
+      const diff = newQty - item.currentQuantity;
+
+      try {
+        await adjustInventory(
+          item.id,
+          diff,
+          "adjustment",
+          "Quick count update"
+        );
+        successCount++;
+      } catch {
+        errorCount++;
+      }
+    }
+
+    setSavingCounts(false);
+
+    if (errorCount === 0) {
+      toast({
+        title: "Counts saved",
+        description: `${successCount} item${successCount !== 1 ? "s" : ""} updated successfully.`,
+      });
+      setQuickCounts({});
+    } else {
+      toast({
+        title: "Partial save",
+        description: `${successCount} saved, ${errorCount} failed. Please retry.`,
+        variant: "destructive",
+      });
+    }
+  }
 
   function openAdjustDialog(item: InventoryItem) {
     setSelectedItem(item);
@@ -156,44 +233,66 @@ export default function InventoryPage() {
 
       {inventory && inventory.length > 0 ? (
         <>
-          {/* Stat Cards */}
-          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="bg-white rounded-2xl ambient-shadow p-5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-                  <span className="material-symbols-outlined text-blue-600 text-xl">inventory_2</span>
-                </div>
-                <div>
-                  <p className="text-xs uppercase font-bold text-gray-400 tracking-wider">Total Items</p>
-                  <p className="text-2xl font-extrabold text-gray-900">{summaryStats.total}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl ambient-shadow p-5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center">
-                  <span className="material-symbols-outlined text-red-600 text-xl">warning</span>
-                </div>
-                <div>
-                  <p className="text-xs uppercase font-bold text-gray-400 tracking-wider">Low Stock Alerts</p>
-                  <p className="text-2xl font-extrabold text-gray-900">{summaryStats.lowStock}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl ambient-shadow p-5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
-                  <span className="material-symbols-outlined text-green-600 text-xl">payments</span>
-                </div>
-                <div>
-                  <p className="text-xs uppercase font-bold text-gray-400 tracking-wider">Total Value</p>
-                  <p className="text-2xl font-extrabold text-gray-900">{formatCurrency(summaryStats.totalValue)}</p>
-                </div>
-              </div>
-            </div>
+          {/* Quick Count / Normal toggle */}
+          <div className="mb-6 flex items-center gap-3">
+            <button
+              onClick={() => {
+                setQuickCountMode((prev) => !prev);
+                if (quickCountMode) setQuickCounts({});
+              }}
+              className={`flex items-center gap-2 h-11 px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md active:scale-95 transition-all duration-150 ${
+                quickCountMode
+                  ? "bg-white border-2 border-blue-600 text-blue-700"
+                  : "bg-gradient-to-r from-blue-700 to-blue-900 text-white"
+              }`}
+            >
+              <span className="material-symbols-outlined text-lg">
+                {quickCountMode ? "close" : "speed"}
+              </span>
+              {quickCountMode ? "Exit Quick Count" : "Quick Count"}
+            </button>
           </div>
+
+          {/* Stat Cards (hidden in quick count mode) */}
+          {!quickCountMode && (
+            <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="bg-white rounded-2xl ambient-shadow p-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <span className="material-symbols-outlined text-blue-600 text-xl">inventory_2</span>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase font-bold text-gray-400 tracking-wider">Total Items</p>
+                    <p className="text-2xl font-extrabold text-gray-900">{summaryStats.total}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl ambient-shadow p-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center">
+                    <span className="material-symbols-outlined text-red-600 text-xl">warning</span>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase font-bold text-gray-400 tracking-wider">Low Stock Alerts</p>
+                    <p className="text-2xl font-extrabold text-gray-900">{summaryStats.lowStock}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl ambient-shadow p-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
+                    <span className="material-symbols-outlined text-green-600 text-xl">payments</span>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase font-bold text-gray-400 tracking-wider">Total Value</p>
+                    <p className="text-2xl font-extrabold text-gray-900">{formatCurrency(summaryStats.totalValue)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Search */}
           <div className="mb-4">
@@ -212,7 +311,78 @@ export default function InventoryPage() {
             <div className="py-12 text-center text-gray-500 font-medium">
               No items match your search.
             </div>
+          ) : quickCountMode ? (
+            /* ----- Quick Count Mode ----- */
+            <div className="space-y-0">
+              {/* Updated counter */}
+              <div className="mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-blue-600 text-lg">edit_note</span>
+                <span className="text-sm font-semibold text-gray-600">
+                  {changedItems.length} of {filtered.length} items updated
+                </span>
+              </div>
+
+              <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: "0px 10px 40px rgba(45,51,53,0.06)" }}>
+                {filtered.map((item, idx) => {
+                  const hasChanged =
+                    quickCounts[item.id] !== undefined &&
+                    quickCounts[item.id] !== "" &&
+                    parseFloat(quickCounts[item.id]) !== item.currentQuantity;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`flex items-center gap-4 px-5 py-3.5 border-b border-gray-100 last:border-0 transition-colors ${
+                        hasChanged ? "bg-blue-50" : ""
+                      }`}
+                    >
+                      {/* Name */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{item.ingredientName}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          Current: {item.currentQuantity} {item.unit}
+                        </p>
+                      </div>
+
+                      {/* Input + unit */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <input
+                          ref={(el) => { inputRefs.current[item.id] = el; }}
+                          type="number"
+                          step="any"
+                          min="0"
+                          placeholder={String(item.currentQuantity)}
+                          value={quickCounts[item.id] ?? ""}
+                          onChange={(e) => handleQuickCountChange(item.id, e.target.value)}
+                          onKeyDown={(e) => handleQuickCountKeyDown(e, idx)}
+                          className="w-24 h-12 rounded-lg bg-gray-50 border border-gray-200 px-3 text-right text-base font-semibold text-gray-900 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                        />
+                        <span className="text-sm text-gray-500 font-medium w-8">{item.unit}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Sticky save bar */}
+              <div className="sticky bottom-0 bg-white border-t border-gray-200 px-5 py-4 mt-4 rounded-2xl" style={{ boxShadow: "0px -4px 20px rgba(45,51,53,0.08)" }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-gray-600">
+                    {changedItems.length} item{changedItems.length !== 1 ? "s" : ""} to save
+                  </span>
+                  <button
+                    onClick={handleSaveAllCounts}
+                    disabled={changedItems.length === 0 || savingCounts}
+                    className="h-12 px-6 bg-gradient-to-r from-blue-700 to-blue-900 text-white text-sm font-bold rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-lg">save</span>
+                    {savingCounts ? "Saving..." : "Save All Counts"}
+                  </button>
+                </div>
+              </div>
+            </div>
           ) : (
+            /* ----- Normal Table Mode ----- */
             <div className="bg-white rounded-2xl ambient-shadow overflow-hidden">
               <table className="w-full">
                 <thead>
@@ -309,7 +479,7 @@ export default function InventoryPage() {
         <DialogContent className="rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-gray-900">
-              Adjust Inventory \u2014 {selectedItem?.ingredientName}
+              Adjust Inventory &mdash; {selectedItem?.ingredientName}
             </DialogTitle>
           </DialogHeader>
           {selectedItem && (

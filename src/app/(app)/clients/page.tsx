@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { LoadingScreen } from "@/components/layout/LoadingScreen";
 import { useClients } from "@/lib/hooks/useClients";
+import { useEvents } from "@/lib/hooks/useEvents";
+import { formatCurrency } from "@/lib/utils";
 
 const AVATAR_COLORS = [
   { bg: "bg-blue-100", text: "text-blue-700" },
@@ -16,6 +18,13 @@ const AVATAR_COLORS = [
 
 const ROWS_PER_PAGE = 10;
 
+const SEGMENTS = [
+  { value: "all", label: "All" },
+  { value: "corporate", label: "Corporate" },
+  { value: "private", label: "Private" },
+  { value: "nonprofit", label: "Non-Profit" },
+];
+
 function getInitials(name: string) {
   return name
     .split(" ")
@@ -25,22 +34,57 @@ function getInitials(name: string) {
     .slice(0, 2);
 }
 
+function toDate(date: Date | any): Date {
+  if (!date) return new Date(0);
+  return date instanceof Date ? date : new Date(date.seconds * 1000);
+}
+
 export default function ClientsPage() {
   const { data: clients, loading, error } = useClients();
+  const { data: allEvents } = useEvents();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [segment, setSegment] = useState("all");
 
+  // Segment + search filter
   const filtered = useMemo(() => {
     if (!clients) return [];
+    let result = clients;
+
+    // Apply segment filter
+    if (segment === "corporate") {
+      result = result.filter(
+        (c) => c.company && c.company.trim().length > 0
+      );
+    } else if (segment === "private") {
+      result = result.filter(
+        (c) => !c.company || c.company.trim().length === 0
+      );
+    } else if (segment === "nonprofit") {
+      result = result.filter(
+        (c) =>
+          c.company &&
+          (c.company.toLowerCase().includes("nonprofit") ||
+            c.company.toLowerCase().includes("non-profit") ||
+            c.company.toLowerCase().includes("foundation") ||
+            c.company.toLowerCase().includes("charity"))
+      );
+    }
+
+    // Apply search
     const q = search.toLowerCase();
-    return clients.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.email.toLowerCase().includes(q) ||
-        c.phone.includes(q) ||
-        (c.company && c.company.toLowerCase().includes(q))
-    );
-  }, [clients, search]);
+    if (q) {
+      result = result.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          c.email.toLowerCase().includes(q) ||
+          c.phone.includes(q) ||
+          (c.company && c.company.toLowerCase().includes(q))
+      );
+    }
+
+    return result;
+  }, [clients, search, segment]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE));
   const paginated = filtered.slice(
@@ -48,10 +92,10 @@ export default function ClientsPage() {
     page * ROWS_PER_PAGE
   );
 
-  // Reset page when search changes
+  // Reset page when search/segment changes
   React.useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [search, segment]);
 
   if (loading) return <LoadingScreen />;
   if (error) {
@@ -62,25 +106,59 @@ export default function ClientsPage() {
     );
   }
 
-  // Stat calculations
+  // --- Enhanced stat calculations ---
   const totalClients = clients?.length ?? 0;
-  const activeThisMonth = clients
-    ? clients.filter((c) => {
-        if (!c.updatedAt) return false;
-        const updated =
-          c.updatedAt instanceof Date
-            ? c.updatedAt
-            : new Date((c.updatedAt as any).seconds * 1000);
-        const now = new Date();
-        return (
-          updated.getMonth() === now.getMonth() &&
-          updated.getFullYear() === now.getFullYear()
-        );
-      }).length
-    : 0;
-  const corporatePartners = clients
-    ? clients.filter((c) => c.company && c.company.trim().length > 0).length
-    : 0;
+
+  // Active this month: clients with events this month
+  const now = new Date();
+  const activeThisMonth = (() => {
+    if (!clients || !allEvents) return 0;
+    const clientIdsWithEventsThisMonth = new Set(
+      allEvents
+        .filter((e) => {
+          const d = toDate(e.eventDate);
+          return (
+            d.getMonth() === now.getMonth() &&
+            d.getFullYear() === now.getFullYear()
+          );
+        })
+        .map((e) => e.clientId)
+    );
+    return clientIdsWithEventsThisMonth.size;
+  })();
+
+  // Total revenue: sum from all completed client events
+  const totalRevenue = (() => {
+    if (!allEvents) return 0;
+    return allEvents
+      .filter((e) => e.status === "completed")
+      .reduce((sum, e) => sum + (e.totalPrice || 0), 0);
+  })();
+
+  // Top client: highest revenue
+  const topClient = (() => {
+    if (!allEvents || !clients || clients.length === 0) return "--";
+    const revenueByClient: Record<string, number> = {};
+    allEvents
+      .filter((e) => e.status === "completed")
+      .forEach((e) => {
+        revenueByClient[e.clientId] =
+          (revenueByClient[e.clientId] || 0) + (e.totalPrice || 0);
+      });
+
+    let maxId = "";
+    let maxRev = 0;
+    for (const [cid, rev] of Object.entries(revenueByClient)) {
+      if (rev > maxRev) {
+        maxRev = rev;
+        maxId = cid;
+      }
+    }
+
+    if (!maxId) return "--";
+    const c = clients.find((cl) => cl.id === maxId);
+    return c ? c.name : "--";
+  })();
 
   const stats = [
     {
@@ -98,18 +176,19 @@ export default function ClientsPage() {
       bg: "bg-green-50",
     },
     {
-      label: "Corporate Partners",
-      value: corporatePartners,
-      icon: "business",
+      label: "Total Revenue",
+      value: formatCurrency(totalRevenue),
+      icon: "payments",
       color: "text-purple-600",
       bg: "bg-purple-50",
     },
     {
-      label: "Client Satisfaction",
-      value: "98%",
-      icon: "sentiment_satisfied",
+      label: "Top Client",
+      value: topClient,
+      icon: "star",
       color: "text-amber-600",
       bg: "bg-amber-50",
+      small: true,
     },
   ];
 
@@ -132,7 +211,10 @@ export default function ClientsPage() {
             {stats.map((stat) => (
               <div
                 key={stat.label}
-                className="bg-white rounded-2xl p-6 ambient-shadow"
+                className="bg-white rounded-2xl p-6"
+                style={{
+                  boxShadow: "0px 10px 40px rgba(45,51,53,0.06)",
+                }}
               >
                 <div className="flex items-center justify-between mb-3">
                   <div
@@ -145,7 +227,11 @@ export default function ClientsPage() {
                     </span>
                   </div>
                 </div>
-                <p className="text-3xl font-extrabold text-gray-900">
+                <p
+                  className={`${
+                    (stat as any).small ? "text-lg" : "text-3xl"
+                  } font-extrabold text-gray-900`}
+                >
                   {stat.value}
                 </p>
                 <p className="text-xs uppercase font-bold text-gray-400 tracking-wider mt-1">
@@ -155,18 +241,37 @@ export default function ClientsPage() {
             ))}
           </div>
 
-          {/* Search */}
-          <div className="relative max-w-md">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xl">
-              search
-            </span>
-            <input
-              type="text"
-              placeholder="Search clients..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-11 pl-10 pr-4 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-            />
+          {/* Search + Segment Filter */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1 max-w-md">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xl">
+                search
+              </span>
+              <input
+                type="text"
+                placeholder="Search clients..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full h-11 pl-10 pr-4 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              />
+            </div>
+
+            {/* Segment filter tabs */}
+            <div className="flex items-center bg-gray-100 rounded-xl p-1">
+              {SEGMENTS.map((seg) => (
+                <button
+                  key={seg.value}
+                  onClick={() => setSegment(seg.value)}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors ${
+                    segment === seg.value
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  {seg.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Data Table */}
@@ -175,7 +280,12 @@ export default function ClientsPage() {
               No clients match your search.
             </div>
           ) : (
-            <div className="bg-white rounded-2xl ambient-shadow overflow-hidden">
+            <div
+              className="bg-white rounded-2xl overflow-hidden"
+              style={{
+                boxShadow: "0px 10px 40px rgba(45,51,53,0.06)",
+              }}
+            >
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-100">

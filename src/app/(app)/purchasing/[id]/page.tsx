@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LoadingScreen } from "@/components/layout/LoadingScreen";
@@ -19,11 +19,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useDocument, useCollection } from "@/lib/hooks/useFirestore";
-import { updateDocument, addDocument } from "@/lib/firebase/firestore";
+import { updateDocument, addDocument, getDocuments } from "@/lib/firebase/firestore";
 import { orderBy } from "firebase/firestore";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import type { PurchaseOrder, POLine, POStatus } from "@/lib/types/purchaseOrder";
+
+// Price history tracking: maps ingredientName -> last cost per pack from previous POs
+interface PriceHistory {
+  [ingredientName: string]: number;
+}
 
 const statusBadgeStyles: Record<POStatus, string> = {
   draft: "bg-gray-100 text-gray-600",
@@ -111,6 +116,44 @@ export default function PurchaseOrderDetailPage() {
   const [receivingData, setReceivingData] = useState<ReceivingData>({});
   const [saving, setSaving] = useState(false);
   const [showAddLineDialog, setShowAddLineDialog] = useState(false);
+  const [priceHistory, setPriceHistory] = useState<PriceHistory>({});
+
+  // Load price history from other POs for comparison
+  const { data: allOrders } = useCollection<PurchaseOrder>(
+    "purchaseOrders",
+    orderBy("createdAt", "desc")
+  );
+
+  useEffect(() => {
+    if (!allOrders || !lines || lines.length === 0) return;
+
+    async function loadPriceHistory() {
+      const history: PriceHistory = {};
+      // Find previous POs (not the current one)
+      const otherPOs = allOrders!.filter((o) => o.id !== id);
+
+      for (const otherPO of otherPOs.slice(0, 10)) {
+        try {
+          const otherLines = await getDocuments<POLine>(
+            `purchaseOrders/${otherPO.id}/lines`,
+            orderBy("ingredientName")
+          );
+          for (const ol of otherLines) {
+            // Only record the most recent previous price (first match wins)
+            if (ol.ingredientName && !history[ol.ingredientName]) {
+              history[ol.ingredientName] =
+                ol.actualCostPerPack || ol.expectedCostPerPack || 0;
+            }
+          }
+        } catch {
+          // skip
+        }
+      }
+      setPriceHistory(history);
+    }
+
+    loadPriceHistory();
+  }, [allOrders, lines, id]);
   const [newLine, setNewLine] = useState({
     ingredientName: "",
     quantityNeeded: "",
@@ -426,7 +469,28 @@ export default function PurchaseOrderDetailPage() {
                     </td>
                     <td className="px-5 py-3.5 text-sm text-gray-600 hidden md:table-cell">{line.packSize || "\u2014"}</td>
                     <td className="px-5 py-3.5 text-sm text-gray-700">{line.packsToOrder}</td>
-                    <td className="px-5 py-3.5 text-sm text-gray-700 text-right">{formatCurrency(line.expectedTotalCost)}</td>
+                    <td className="px-5 py-3.5 text-sm text-gray-700 text-right">
+                          <div>{formatCurrency(line.expectedTotalCost)}</div>
+                          {(() => {
+                            const prevPrice = priceHistory[line.ingredientName];
+                            const currentPrice = line.expectedCostPerPack;
+                            if (!prevPrice || prevPrice === 0 || !currentPrice) return null;
+                            const diff = currentPrice - prevPrice;
+                            const pctChange = (diff / prevPrice) * 100;
+                            if (Math.abs(diff) < 0.01) return null;
+                            return diff > 0 ? (
+                              <span className="text-[10px] font-bold text-red-600 flex items-center justify-end gap-0.5 mt-0.5">
+                                <span className="material-symbols-outlined text-[11px]">arrow_upward</span>
+                                {formatCurrency(diff)} (+{pctChange.toFixed(0)}%)
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-green-600 flex items-center justify-end gap-0.5 mt-0.5">
+                                <span className="material-symbols-outlined text-[11px]">arrow_downward</span>
+                                {formatCurrency(Math.abs(diff))} (-{Math.abs(pctChange).toFixed(0)}%)
+                              </span>
+                            );
+                          })()}
+                        </td>
                     {po.status !== "draft" && (
                       <>
                         <td className="px-5 py-3.5 text-sm text-gray-700 text-right hidden lg:table-cell">

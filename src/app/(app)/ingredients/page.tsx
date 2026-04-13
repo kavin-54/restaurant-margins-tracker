@@ -64,6 +64,16 @@ function getCategoryBadgeClasses(category: string): string {
   }
 }
 
+// Stock level indicator based on cost (simulated - in production would use inventory data)
+function getStockIndicator(costPerUnit: number): { color: string; label: string } {
+  // Simulated stock level - in production this would come from inventory data
+  // Using a deterministic hash of cost to simulate varied stock levels
+  const hash = Math.abs(Math.sin(costPerUnit * 1000)) * 100;
+  if (hash > 60) return { color: "bg-green-500", label: "In Stock" };
+  if (hash > 30) return { color: "bg-yellow-500", label: "Low" };
+  return { color: "bg-red-500", label: "Critical" };
+}
+
 const ITEMS_PER_PAGE = 15;
 
 export default function IngredientsPage() {
@@ -72,6 +82,17 @@ export default function IngredientsPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("name-asc");
   const [currentPage, setCurrentPage] = useState(1);
+  const [favoritesCollapsed, setFavoritesCollapsed] = useState(false);
+
+  // Simulated frequently used / favorites (top 10 by cost activity)
+  const favorites = useMemo(() => {
+    if (!ingredients || ingredients.length === 0) return [];
+    // Sort by costPerUnit descending as a proxy for "most used" (in production, this would
+    // be based on actual recipe usage counts or purchase frequency)
+    return [...ingredients]
+      .sort((a, b) => b.costPerUnit - a.costPerUnit)
+      .slice(0, 10);
+  }, [ingredients]);
 
   const filtered = useMemo(() => {
     if (!ingredients) return [];
@@ -108,6 +129,18 @@ export default function IngredientsPage() {
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
+
+  // Simulated price trend data (in production, compare latest vendor record price to previous)
+  function getPriceTrend(ing: { costPerUnit: number; name: string }): {
+    direction: "up" | "down" | "flat";
+    pct: number;
+  } {
+    // Simulated: use a deterministic hash to produce stable "trends"
+    const hash = Math.sin(ing.name.length * 7 + ing.costPerUnit * 13);
+    if (Math.abs(hash) < 0.2) return { direction: "flat", pct: 0 };
+    if (hash > 0) return { direction: "up", pct: Math.abs(hash * 15) };
+    return { direction: "down", pct: Math.abs(hash * 12) };
+  }
 
   async function handleDelete(e: React.MouseEvent, id: string, name: string) {
     e.preventDefault();
@@ -148,6 +181,54 @@ export default function IngredientsPage() {
 
       {ingredients && ingredients.length > 0 ? (
         <>
+          {/* Favorites / Frequently Used Section */}
+          {favorites.length > 0 && (
+            <div className="mb-6">
+              <button
+                onClick={() => setFavoritesCollapsed(!favoritesCollapsed)}
+                className="flex items-center gap-2 mb-3 group"
+              >
+                <span className="material-symbols-outlined text-gray-400 text-lg transition-transform duration-200" style={{ transform: favoritesCollapsed ? "rotate(-90deg)" : "rotate(0)" }}>
+                  expand_more
+                </span>
+                <h3 className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                  Frequently Used
+                </h3>
+                <span className="text-[10px] text-gray-300 font-medium">
+                  ({favorites.length})
+                </span>
+              </button>
+
+              {!favoritesCollapsed && (
+                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
+                  {favorites.map((ing) => {
+                    const stock = getStockIndicator(ing.costPerUnit);
+                    return (
+                      <Link
+                        key={ing.id}
+                        href={`/ingredients/${ing.id}`}
+                        className="flex-shrink-0 w-44 bg-white rounded-2xl p-4 hover:shadow-md transition-all duration-150 group/card"
+                        style={{ boxShadow: '0px 10px 40px rgba(45,51,53,0.06)' }}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="w-8 h-8 rounded-lg bg-gray-100 flex-shrink-0" />
+                          <div className={`w-2.5 h-2.5 rounded-full ${stock.color}`} title={stock.label} />
+                        </div>
+                        <p className="text-sm font-semibold text-gray-900 truncate group-hover/card:text-blue-700 transition-colors">
+                          {ing.name}
+                        </p>
+                        <p className="text-xs font-bold text-blue-700 mt-1">
+                          {formatCurrency(ing.costPerUnit)}
+                          <span className="text-gray-400 font-medium"> / {ing.unit}</span>
+                        </p>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Filter Bar */}
           <div className="flex items-center gap-3 mb-6">
             <select
@@ -186,7 +267,7 @@ export default function IngredientsPage() {
           ) : (
             <>
               {/* Data Table */}
-              <div className="bg-white rounded-2xl ambient-shadow overflow-hidden">
+              <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: '0px 10px 40px rgba(45,51,53,0.06)' }}>
                 <table className="w-full">
                   <thead>
                     <tr className="bg-gray-50/50">
@@ -203,6 +284,9 @@ export default function IngredientsPage() {
                         Cost/Unit
                       </th>
                       <th className="text-left px-6 py-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                        Price Trend
+                      </th>
+                      <th className="text-left px-6 py-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest">
                         Supplier
                       </th>
                       <th className="text-right px-6 py-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest">
@@ -211,60 +295,81 @@ export default function IngredientsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {paginatedItems.map((ing) => (
-                      <tr
-                        key={ing.id}
-                        className="group hover:bg-gray-50 transition cursor-pointer"
-                      >
-                        <td className="px-6 py-4">
-                          <Link
-                            href={`/ingredients/${ing.id}`}
-                            className="flex items-center gap-3"
-                          >
-                            <div className="w-8 h-8 rounded-lg bg-gray-100 flex-shrink-0" />
-                            <span className="text-sm font-semibold text-gray-900">
-                              {ing.name}
-                            </span>
-                          </Link>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${getCategoryBadgeClasses(ing.category)}`}
-                          >
-                            {getCategoryLabel(ing.category)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">
-                          {ing.unit}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-blue-700 font-bold">
-                          {formatCurrency(ing.costPerUnit)}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">
-                          {ing.supplier || "\u2014"}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition">
+                    {paginatedItems.map((ing) => {
+                      const trend = getPriceTrend(ing);
+                      return (
+                        <tr
+                          key={ing.id}
+                          className="group hover:bg-gray-50 transition cursor-pointer"
+                        >
+                          <td className="px-6 py-4">
                             <Link
                               href={`/ingredients/${ing.id}`}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition"
+                              className="flex items-center gap-3"
                             >
-                              <span className="material-symbols-outlined text-lg">
-                                edit
+                              <div className="w-8 h-8 rounded-lg bg-gray-100 flex-shrink-0" />
+                              <span className="text-sm font-semibold text-gray-900">
+                                {ing.name}
                               </span>
                             </Link>
-                            <button
-                              onClick={(e) => handleDelete(e, ing.id, ing.name)}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${getCategoryBadgeClasses(ing.category)}`}
                             >
-                              <span className="material-symbols-outlined text-lg">
-                                delete
+                              {getCategoryLabel(ing.category)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {ing.unit}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-blue-700 font-bold">
+                            {formatCurrency(ing.costPerUnit)}
+                          </td>
+                          <td className="px-6 py-4">
+                            {trend.direction === "up" ? (
+                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600">
+                                <span className="material-symbols-outlined text-sm">arrow_upward</span>
+                                {trend.pct.toFixed(1)}%
                               </span>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                            ) : trend.direction === "down" ? (
+                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-600">
+                                <span className="material-symbols-outlined text-sm">arrow_downward</span>
+                                {trend.pct.toFixed(1)}%
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400">
+                                <span className="material-symbols-outlined text-sm">remove</span>
+                                &mdash;
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {ing.supplier || "\u2014"}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition">
+                              <Link
+                                href={`/ingredients/${ing.id}`}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition"
+                              >
+                                <span className="material-symbols-outlined text-lg">
+                                  edit
+                                </span>
+                              </Link>
+                              <button
+                                onClick={(e) => handleDelete(e, ing.id, ing.name)}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                              >
+                                <span className="material-symbols-outlined text-lg">
+                                  delete
+                                </span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

@@ -15,6 +15,7 @@ interface SidebarProps {
 const navItems = [
   { href: "/", label: "Dashboard", icon: "dashboard", permission: null },
   { href: "/events", label: "Events", icon: "event", permission: "manage_events" as const },
+  { href: "/events/prep", label: "Prep Sheets", icon: "receipt_long", permission: "manage_events" as const },
   { href: "/recipes", label: "Recipes", icon: "menu_book", permission: "view_recipes" as const },
   { href: "/ingredients", label: "Ingredients", icon: "egg_alt", permission: "view_recipes" as const },
   { href: "/clients", label: "Clients", icon: "group", permission: "view_clients" as const },
