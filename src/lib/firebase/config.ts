@@ -28,7 +28,7 @@ console.log(`[⏱ Config] Auth init: ${(performance.now() - t0).toFixed(1)}ms`);
 let db: Firestore;
 try {
   db = initializeFirestore(app, {
-    experimentalAutoDetectLongPolling: true,
+    experimentalForceLongPolling: true,
   });
 } catch {
   // Already initialized (hot reload) — just get the existing instance
