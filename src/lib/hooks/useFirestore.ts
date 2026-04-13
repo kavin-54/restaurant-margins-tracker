@@ -1,53 +1,84 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { collection, doc, onSnapshot, query, QueryConstraint, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 
 // Convert Firestore Timestamps to JS Dates recursively
-function convertTimestamps(obj: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (value instanceof Timestamp) {
-      result[key] = value.toDate();
-    } else if (value && typeof value === "object" && !Array.isArray(value)) {
-      result[key] = convertTimestamps(value as Record<string, unknown>);
-    } else {
-      result[key] = value;
+function convertTimestamps(obj: any): any {
+  if (obj === null || typeof obj !== "object") return obj;
+
+  if (obj instanceof Timestamp) {
+    return obj.toDate();
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(convertTimestamps);
+  }
+
+  const result: Record<string, any> = {};
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      result[key] = convertTimestamps(obj[key]);
     }
   }
   return result;
 }
 
+type LoadStatus = "loading" | "ready" | "timeout" | "error";
+
 interface UseCollectionResult<T> {
   data: T[];
   loading: boolean;
   error: Error | null;
+  status: LoadStatus;
 }
 
 interface UseDocumentResult<T> {
   data: T | null;
   loading: boolean;
   error: Error | null;
+  status: LoadStatus;
 }
 
 export function useCollection<T>(
   collectionPath: string,
-  ...constraints: QueryConstraint[]
+  constraints: QueryConstraint[] = [],
 ): UseCollectionResult<T> {
   const [data, setData] = useState<T[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<LoadStatus>("loading");
   const [error, setError] = useState<Error | null>(null);
 
-  useEffect(() => {
-    console.log(`[Firestore] useCollection("${collectionPath}") subscribing`);
-    console.time(`[Firestore] useCollection("${collectionPath}") first snapshot`);
+  // Serialize constraints to a stable key for the dependency array
+  // Use a more robust serialization for complex constraints
+  const constraintKey = useMemo(() => {
+    try {
+      return JSON.stringify(constraints.map(c => {
+        // Handle cases where c might have a toString or internal structure
+        const str = String(c);
+        return str.includes("[object Object]") ? Math.random().toString() : str;
+      }));
+    } catch (e) {
+      return Math.random().toString();
+    }
+  }, [constraints]);
 
-    // Safety timeout — stop loading after 2 seconds even if Firestore hasn't responded
+  const loading = status === "loading" || status === "timeout";
+
+  useEffect(() => {
+    if (!collectionPath) {
+      setData([]);
+      setStatus("ready");
+      return;
+    }
+
+    setStatus("loading");
+    setError(null);
+
+    // Safety timeout — show "still loading" state after 5 seconds
     const timeout = setTimeout(() => {
-      console.warn(`[Firestore] useCollection("${collectionPath}") TIMEOUT: no response in 2s`);
-      setLoading(false);
-    }, 2000);
+      setStatus(prev => (prev === "loading" ? "timeout" : prev));
+    }, 5000);
 
     let unsubscribe: () => void;
 
@@ -59,44 +90,42 @@ export function useCollection<T>(
         q,
         (snapshot) => {
           clearTimeout(timeout);
-          console.timeEnd(`[Firestore] useCollection("${collectionPath}") first snapshot`);
           try {
             const docs = snapshot.docs.map((d) => ({
               id: d.id,
-              ...convertTimestamps(d.data() as Record<string, unknown>),
+              ...convertTimestamps(d.data()),
             } as T));
-            console.log(`[Firestore] useCollection("${collectionPath}") got ${docs.length} docs`);
             setData(docs);
             setError(null);
+            setStatus("ready");
           } catch (err) {
-            console.error(`[Firestore] useCollection("${collectionPath}") parse error:`, err);
+            console.error(`Error processing snapshot for ${collectionPath}:`, err);
             setError(err instanceof Error ? err : new Error(String(err)));
-          } finally {
-            setLoading(false);
+            setStatus("error");
           }
         },
         (err) => {
           clearTimeout(timeout);
-          console.error(`[Firestore] useCollection("${collectionPath}") error:`, err.code, err.message);
+          console.error(`Firestore subscription error for ${collectionPath}:`, err);
           setError(err instanceof Error ? err : new Error(String(err)));
-          setLoading(false);
+          setStatus("error");
         }
       );
     } catch (err) {
       clearTimeout(timeout);
-      console.error(`[Firestore] useCollection("${collectionPath}") setup failed:`, err);
+      console.error(`Error initializing subscription for ${collectionPath}:`, err);
       setError(err instanceof Error ? err : new Error(String(err)));
-      setLoading(false);
-      return;
+      setStatus("error");
     }
 
     return () => {
       clearTimeout(timeout);
       if (unsubscribe) unsubscribe();
     };
-  }, [collectionPath]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collectionPath, constraintKey]);
 
-  return { data, loading, error };
+  return { data, loading, error, status };
 }
 
 export function useDocument<T>(
@@ -104,24 +133,25 @@ export function useDocument<T>(
   docId: string
 ): UseDocumentResult<T> {
   const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<LoadStatus>("loading");
   const [error, setError] = useState<Error | null>(null);
+
+  const loading = status === "loading" || status === "timeout";
 
   useEffect(() => {
     if (!docId) {
       setData(null);
-      setLoading(false);
+      setStatus("ready");
       return;
     }
 
-    console.log(`[Firestore] useDocument("${collectionPath}/${docId}") subscribing`);
-    console.time(`[Firestore] useDocument("${collectionPath}/${docId}") first snapshot`);
+    setStatus("loading");
+    setError(null);
 
     // Safety timeout
     const timeout = setTimeout(() => {
-      console.warn(`[Firestore] useDocument("${collectionPath}/${docId}") TIMEOUT: no response in 2s`);
-      setLoading(false);
-    }, 2000);
+      setStatus(prev => (prev === "loading" ? "timeout" : prev));
+    }, 5000);
 
     let unsubscribe: () => void;
 
@@ -132,39 +162,35 @@ export function useDocument<T>(
         docRef,
         (snapshot) => {
           clearTimeout(timeout);
-          console.timeEnd(`[Firestore] useDocument("${collectionPath}/${docId}") first snapshot`);
           try {
             if (snapshot.exists()) {
-              console.log(`[Firestore] useDocument("${collectionPath}/${docId}") doc found`);
               setData({
                 id: snapshot.id,
-                ...convertTimestamps(snapshot.data() as Record<string, unknown>),
+                ...convertTimestamps(snapshot.data()),
               } as T);
             } else {
-              console.log(`[Firestore] useDocument("${collectionPath}/${docId}") doc not found`);
               setData(null);
             }
             setError(null);
+            setStatus("ready");
           } catch (err) {
-            console.error(`[Firestore] useDocument("${collectionPath}/${docId}") parse error:`, err);
+            console.error(`Error processing doc snapshot for ${collectionPath}/${docId}:`, err);
             setError(err instanceof Error ? err : new Error(String(err)));
-          } finally {
-            setLoading(false);
+            setStatus("error");
           }
         },
         (err) => {
           clearTimeout(timeout);
-          console.error(`[Firestore] useDocument("${collectionPath}/${docId}") error:`, err.code, err.message);
+          console.error(`Firestore doc subscription error for ${collectionPath}/${docId}:`, err);
           setError(err instanceof Error ? err : new Error(String(err)));
-          setLoading(false);
+          setStatus("error");
         }
       );
     } catch (err) {
       clearTimeout(timeout);
-      console.error(`[Firestore] useDocument("${collectionPath}/${docId}") setup failed:`, err);
+      console.error(`Error initializing doc subscription for ${collectionPath}/${docId}:`, err);
       setError(err instanceof Error ? err : new Error(String(err)));
-      setLoading(false);
-      return;
+      setStatus("error");
     }
 
     return () => {
@@ -173,5 +199,5 @@ export function useDocument<T>(
     };
   }, [collectionPath, docId]);
 
-  return { data, loading, error };
+  return { data, loading, error, status };
 }

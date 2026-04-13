@@ -144,7 +144,7 @@ export default function ClientDetailPage() {
   // Communication notes subcollection
   const { data: communicationNotes } = useCollection<CommunicationNote>(
     `clients/${id}/notes`,
-    orderBy("createdAt", "desc")
+    [orderBy("createdAt", "desc")]
   );
 
   useEffect(() => {

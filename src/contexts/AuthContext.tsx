@@ -1,7 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { onAuthChange, type AppUser } from "@/lib/firebase/auth";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { onAuthChange, signIn, signOut, type AppUser } from "@/lib/firebase/auth";
 import { getDocument } from "@/lib/firebase/firestore";
 import { User } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
@@ -21,21 +21,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  // Auth listener — subscribe once, not on every route change
   useEffect(() => {
-    console.log("[AuthProvider] useEffect running, pathname:", pathname);
-    console.time("[AuthProvider] total auth resolution");
     let timeout: NodeJS.Timeout;
 
     // Safety timeout — if Firebase Auth doesn't respond in 1 second, stop loading
     timeout = setTimeout(() => {
-      console.warn("[AuthProvider] TIMEOUT: Auth did not respond within 1s, forcing load");
-      console.timeEnd("[AuthProvider] total auth resolution");
       setLoading(false);
     }, 1000);
 
     const unsubscribe = onAuthChange(async (firebaseUser: User | null) => {
       clearTimeout(timeout);
-      console.log("[AuthProvider] Auth state received, user:", firebaseUser ? firebaseUser.uid : "null");
 
       if (firebaseUser) {
         // Set user IMMEDIATELY from Firebase Auth — don't block on Firestore
@@ -47,27 +43,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
         setUser(authUser);
         setLoading(false);
-        console.timeEnd("[AuthProvider] total auth resolution");
 
         // Fetch Firestore user doc in the background to get real role
         getDocument<AppUser>("users", firebaseUser.uid)
           .then((userDoc) => {
             if (userDoc) {
-              console.log("[AuthProvider] Background: user doc found, role:", userDoc.role);
               setUser(userDoc);
             }
           })
-          .catch((err) => {
-            console.warn("[AuthProvider] Background: user doc fetch failed:", err);
+          .catch(() => {
+            // Firestore user doc fetch failed — keep using auth-derived user
           });
       } else {
-        console.log("[AuthProvider] No user, redirecting to /login");
         setUser(null);
         setLoading(false);
-        console.timeEnd("[AuthProvider] total auth resolution");
-        if (pathname !== "/login") {
-          router.push("/login");
-        }
       }
     });
 
@@ -75,24 +64,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(timeout);
       unsubscribe();
     };
-  }, [pathname, router]);
+  }, []);
 
-  const handleSignIn = async (email: string, password: string) => {
-    const { signIn } = await import("@/lib/firebase/auth");
+  // Handle routing separately — redirect to login when not authenticated
+  useEffect(() => {
+    if (!loading && !user && pathname !== "/login") {
+      router.push("/login");
+    }
+  }, [loading, user, pathname, router]);
+
+  const handleSignIn = useCallback(async (email: string, password: string) => {
     return signIn(email, password);
-  };
+  }, []);
 
-  const handleSignOut = async () => {
-    const { signOut } = await import("@/lib/firebase/auth");
+  const handleSignOut = useCallback(async () => {
     return signOut();
-  };
+  }, []);
 
-  const value: AuthContextType = {
+  const value = useMemo<AuthContextType>(() => ({
     user,
     loading,
     signIn: handleSignIn,
     signOut: handleSignOut,
-  };
+  }), [user, loading, handleSignIn, handleSignOut]);
 
   if (loading) {
     return (

@@ -6,7 +6,8 @@ import {
   updateDocument,
   deleteDocument,
 } from "@/lib/firebase/firestore";
-import { orderBy, where } from "firebase/firestore";
+import { orderBy, where, QueryConstraint } from "firebase/firestore";
+import { useMemo } from "react";
 
 export interface InventoryItem {
   id: string;
@@ -32,8 +33,9 @@ export interface InventoryAdjustment {
   adjustedAt: Date;
 }
 
-export function useInventory() {
-  return useCollection<InventoryItem>("inventory", orderBy("ingredientName"));
+export function useInventory(additionalConstraints: QueryConstraint[] = []) {
+  const constraints = useMemo(() => [orderBy("ingredientName"), ...additionalConstraints], [additionalConstraints]);
+  return useCollection<InventoryItem>("inventory", constraints);
 }
 
 export function useInventoryItem(ingredientId: string) {
@@ -41,12 +43,15 @@ export function useInventoryItem(ingredientId: string) {
 }
 
 export function useInventoryAdjustments(ingredientId?: string) {
-  const constraints = ingredientId
-    ? [where("ingredientId", "==", ingredientId), orderBy("adjustedAt", "desc")]
-    : [orderBy("adjustedAt", "desc")];
+  const constraints = useMemo(() =>
+    ingredientId
+      ? [where("ingredientId", "==", ingredientId), orderBy("adjustedAt", "desc")]
+      : [orderBy("adjustedAt", "desc")],
+    [ingredientId]
+  );
   return useCollection<InventoryAdjustment>(
     "inventoryAdjustments",
-    ...constraints
+    constraints
   );
 }
 

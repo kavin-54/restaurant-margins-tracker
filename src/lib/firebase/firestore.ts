@@ -17,17 +17,23 @@ import {
 // Firestore timestamp converter
 const timestampConverter: FirestoreDataConverter<any> = {
   toFirestore: (data: any) => {
-    const converted: any = {};
-    for (const [key, value] of Object.entries(data)) {
-      if (value instanceof Date) {
-        converted[key] = Timestamp.fromDate(value);
-      } else if (value instanceof Object && value !== null) {
-        converted[key] = value;
-      } else {
-        converted[key] = value;
+    const convertDates = (obj: any): any => {
+      if (obj instanceof Date) {
+        return Timestamp.fromDate(obj);
       }
-    }
-    return converted;
+      if (Array.isArray(obj)) {
+        return obj.map(convertDates);
+      }
+      if (obj !== null && typeof obj === "object" && !(obj instanceof Timestamp)) {
+        const converted: any = {};
+        for (const [key, value] of Object.entries(obj)) {
+          converted[key] = convertDates(value);
+        }
+        return converted;
+      }
+      return obj;
+    };
+    return convertDates(data);
   },
   fromFirestore: (snapshot: DocumentSnapshot, options: any) => {
     const data = snapshot.data(options);
@@ -53,7 +59,7 @@ export async function getDocument<T>(
     timestampConverter
   );
   const snapshot = await getDoc(docRef);
-  return snapshot.exists() ? (snapshot.data() as T) : null;
+  return snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as T) : null;
 }
 
 export async function getDocuments<T>(
@@ -65,7 +71,7 @@ export async function getDocuments<T>(
   );
   const q = query(collectionRef, ...constraints);
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((doc) => doc.data() as T);
+  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as T));
 }
 
 export async function addDocument<T extends { id?: string }>(
@@ -87,9 +93,7 @@ export async function updateDocument<T>(
   docId: string,
   data: Partial<T>
 ): Promise<void> {
-  const docRef = doc(db, collectionPath, docId).withConverter(
-    timestampConverter
-  );
+  const docRef = doc(db, collectionPath, docId);
   return updateDoc(docRef, data as any);
 }
 

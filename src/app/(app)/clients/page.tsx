@@ -97,22 +97,13 @@ export default function ClientsPage() {
     setPage(1);
   }, [search, segment]);
 
-  if (loading) return <LoadingScreen />;
-  if (error) {
-    return (
-      <div className="p-6 text-destructive">
-        Failed to load clients. Please try again.
-      </div>
-    );
-  }
-
   // --- Enhanced stat calculations ---
   const totalClients = clients?.length ?? 0;
 
   // Active this month: clients with events this month
-  const now = new Date();
-  const activeThisMonth = (() => {
+  const activeThisMonth = useMemo(() => {
     if (!clients || !allEvents) return 0;
+    const now = new Date();
     const clientIdsWithEventsThisMonth = new Set(
       allEvents
         .filter((e) => {
@@ -125,18 +116,18 @@ export default function ClientsPage() {
         .map((e) => e.clientId)
     );
     return clientIdsWithEventsThisMonth.size;
-  })();
+  }, [clients, allEvents]);
 
   // Total revenue: sum from all completed client events
-  const totalRevenue = (() => {
+  const totalRevenue = useMemo(() => {
     if (!allEvents) return 0;
     return allEvents
       .filter((e) => e.status === "completed")
       .reduce((sum, e) => sum + (e.totalPrice || 0), 0);
-  })();
+  }, [allEvents]);
 
   // Top client: highest revenue
-  const topClient = (() => {
+  const topClient = useMemo(() => {
     if (!allEvents || !clients || clients.length === 0) return "--";
     const revenueByClient: Record<string, number> = {};
     allEvents
@@ -158,7 +149,16 @@ export default function ClientsPage() {
     if (!maxId) return "--";
     const c = clients.find((cl) => cl.id === maxId);
     return c ? c.name : "--";
-  })();
+  }, [allEvents, clients]);
+
+  if (loading) return <LoadingScreen />;
+  if (error) {
+    return (
+      <div className="p-6 text-destructive">
+        Failed to load clients. Please try again.
+      </div>
+    );
+  }
 
   const stats = [
     {

@@ -2,7 +2,8 @@
 
 import { useCollection } from "./useFirestore";
 import { addDocument } from "@/lib/firebase/firestore";
-import { orderBy, where } from "firebase/firestore";
+import { orderBy, where, QueryConstraint } from "firebase/firestore";
+import { useMemo } from "react";
 
 export interface WasteEntry {
   id: string;
@@ -18,11 +19,14 @@ export interface WasteEntry {
   notes?: string;
 }
 
-export function useWasteLog(eventId?: string) {
-  const constraints = eventId
-    ? [where("eventId", "==", eventId), orderBy("date", "desc")]
-    : [orderBy("date", "desc")];
-  return useCollection<WasteEntry>("wasteLog", ...constraints);
+export function useWasteLog(eventId?: string, additionalConstraints: QueryConstraint[] = []) {
+  const constraints = useMemo(() => {
+    const base = eventId
+      ? [where("eventId", "==", eventId), orderBy("date", "desc")]
+      : [orderBy("date", "desc")];
+    return [...base, ...additionalConstraints];
+  }, [eventId, additionalConstraints]);
+  return useCollection<WasteEntry>("wasteLog", constraints);
 }
 
 export async function addWasteEntry(data: Omit<WasteEntry, "id">) {

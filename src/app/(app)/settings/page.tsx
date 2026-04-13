@@ -16,10 +16,10 @@ const DEFAULT_CONFIG = {
   taxRate: 8.875,
   defaultMarkupPercentage: 35,
   defaultMinMarginPercentage: 20,
-  laborCostPerHour: 18,
+  laborCostPerHour: 150,
   prepTimeMinutesPerServing: 5,
-  currency: "USD",
-  timezone: "America/New_York",
+  currency: "INR",
+  timezone: "Asia/Kolkata",
 };
 
 export default function SettingsPage() {
@@ -218,7 +218,7 @@ export default function SettingsPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Labor Cost per Hour ($)</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Labor Cost per Hour (₹)</label>
               <input
                 type="number"
                 step="0.01"
@@ -255,7 +255,7 @@ export default function SettingsPage() {
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Currency</label>
               <input
-                placeholder="USD"
+                placeholder="INR"
                 value={form.currency}
                 onChange={(e) => updateField("currency", e.target.value)}
                 className="w-full bg-gray-50 border-none h-12 rounded-lg px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
@@ -264,7 +264,7 @@ export default function SettingsPage() {
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Timezone</label>
               <input
-                placeholder="America/New_York"
+                placeholder="Asia/Kolkata"
                 value={form.timezone}
                 onChange={(e) => updateField("timezone", e.target.value)}
                 className="w-full bg-gray-50 border-none h-12 rounded-lg px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"

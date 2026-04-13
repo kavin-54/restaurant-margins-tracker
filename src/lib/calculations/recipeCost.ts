@@ -1,53 +1,59 @@
-import { RecipeLine } from "@/lib/types";
-import { convert, convertToBaseUnit } from "./unitConversion";
+import { convert } from "./unitConversion";
 import {
   calculateEPCost,
   calculateCookedCost,
-  calculateFullYieldCost,
 } from "./yield";
 
 /**
  * Data structure for ingredient information needed for cost calculations
  */
 export interface IngredientData {
-  costPerBaseUnit: number; // Cost per oz, fl_oz, or each
-  trimYield: number; // 0-100 percentage
-  cookingYield: number; // 0-100 percentage
-  primaryUnit: string; // The unit to use for display/conversion
+  costPerUnit: number;
+  trimYield?: number; // 0-100 percentage
+  cookingYield?: number; // 0-100 percentage
+  unit: string;
 }
 
 /**
  * Data structure for sub-recipe information needed for cost calculations
  */
 export interface SubRecipeData {
-  costPerPortion: number; // Cost per portion unit
-  portionUnit: string; // e.g., "each", "oz", "ml"
-  totalYieldUnit: string; // The unit that yield is measured in
-  totalCost: number; // Total cost to produce this recipe
-  totalYieldQuantity: number; // Total quantity produced
+  costPerServing: number;
+  servings: number;
+  totalRecipeCost: number;
+  totalCost: number;
+  totalYieldQuantity: number;
+  totalYieldUnit: string;
+  unit?: string;
 }
 
-/**
- * Result of a line cost calculation
- */
 export interface LineCostResult {
   lineCost: number;
   quantity: number;
   unit: string;
 }
 
+export interface RecipeCostResult {
+  totalCost: number;
+  costPerPortion: number;
+  portions: number;
+}
+
+/**
+ * Simplified RecipeLine that matches the hook interface but allows for sub-recipes
+ */
+export interface RecipeLine {
+  id: string;
+  ingredientId: string; // Used as referenceId for both ingredients and sub-recipes
+  type?: "ingredient" | "sub-recipe";
+  quantity: number;
+  unit: string;
+  costPerUnit: number;
+  lineCost: number;
+}
+
 /**
  * Calculates the cost of a single recipe line item.
- *
- * For ingredients: converts to base unit and multiplies by ingredient's
- * edible portion cost (accounting for trim and cooking yield).
- * For sub-recipes: calculates cost based on the recipe's cost per yield unit.
- *
- * @param line - The recipe line item
- * @param ingredientData - Map of ingredient IDs to ingredient cost/yield data
- * @param recipeData - Map of recipe IDs to recipe cost/yield data
- * @returns The total cost of this line item
- * @throws Error if ingredient/recipe not found or conversion fails
  */
 export function calculateLineCost(
   line: RecipeLine,
@@ -58,76 +64,57 @@ export function calculateLineCost(
     throw new Error(`Invalid quantity for line: ${line.quantity}`);
   }
 
-  if (line.type === "ingredient") {
-    const ingredient = ingredientData.get(line.referenceId);
+  const type = line.type || "ingredient";
+
+  if (type === "ingredient") {
+    const ingredient = ingredientData.get(line.ingredientId);
 
     if (!ingredient) {
-      throw new Error(`Ingredient not found: ${line.referenceId}`);
+      // If we don't have the full ingredient data, fall back to the line's costPerUnit
+      return line.quantity * (line.costPerUnit || 0);
     }
 
-    // Convert line quantity to base unit
-    const baseQuantity = convert(
-      line.quantity,
-      line.unit,
-      ingredient.primaryUnit
-    );
+    // Convert line quantity to base unit if they differ
+    let quantity = line.quantity;
+    try {
+      if (line.unit !== ingredient.unit) {
+        quantity = convert(line.quantity, line.unit, ingredient.unit);
+      }
+    } catch (e) {
+      console.warn(`Conversion failed for ${line.ingredientId}, using raw quantity:`, e);
+    }
 
     // Calculate the cost per unit at EP (edible portion after trim loss)
     const epCostPerUnit = calculateEPCost(
-      ingredient.costPerBaseUnit,
-      ingredient.trimYield
+      ingredient.costPerUnit,
+      ingredient.trimYield || 100
     );
 
     // Calculate final cost per unit (after cooking yield)
     const finalCostPerUnit = calculateCookedCost(
       epCostPerUnit,
-      ingredient.cookingYield
+      ingredient.cookingYield || 100
     );
 
-    return baseQuantity * finalCostPerUnit;
+    return quantity * finalCostPerUnit;
   }
 
-  if (line.type === "sub-recipe") {
-    const recipe = recipeData.get(line.referenceId);
+  if (type === "sub-recipe") {
+    const recipe = recipeData.get(line.ingredientId);
 
     if (!recipe) {
-      throw new Error(`Recipe not found: ${line.referenceId}`);
+      return line.quantity * (line.costPerUnit || 0);
     }
 
-    // Convert the line quantity to the recipe's yield unit
-    const quantityInYieldUnit = convert(
-      line.quantity,
-      line.unit,
-      recipe.totalYieldUnit
-    );
-
-    // Calculate cost per unit of yield
-    const costPerYieldUnit = recipe.totalCost / recipe.totalYieldQuantity;
-
-    return quantityInYieldUnit * costPerYieldUnit;
+    // Sub-recipes are usually measured in servings or a yield unit
+    return line.quantity * recipe.costPerServing;
   }
 
-  throw new Error(`Unknown line type: ${line.type}`);
-}
-
-/**
- * Result of recipe cost calculation
- */
-export interface RecipeCostResult {
-  totalCost: number;
-  costPerPortion: number;
-  portions: number;
+  return line.quantity * (line.costPerUnit || 0);
 }
 
 /**
  * Calculates the total cost of a recipe and cost per portion.
- *
- * @param lines - All recipe line items
- * @param ingredientData - Map of ingredient IDs to ingredient cost/yield data
- * @param recipeData - Map of recipe IDs to recipe cost/yield data
- * @param portionCount - Number of portions this recipe yields
- * @returns Object containing total cost and cost per portion
- * @throws Error if portion count is invalid
  */
 export function calculateRecipeCost(
   lines: RecipeLine[],
@@ -139,11 +126,7 @@ export function calculateRecipeCost(
     throw new Error("Portion count must be greater than 0");
   }
 
-  if (!Array.isArray(lines)) {
-    throw new Error("Lines must be an array");
-  }
-
-  const totalCost = lines.reduce((sum, line) => {
+  const totalCost = (lines || []).reduce((sum, line) => {
     return sum + calculateLineCost(line, ingredientData, recipeData);
   }, 0);
 

@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { LoadingScreen } from "@/components/layout/LoadingScreen";
@@ -217,6 +218,7 @@ export default function EventsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("calendar");
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
 
+  const router = useRouter();
   const filterArg = statusFilter === "all" ? undefined : statusFilter;
   const { data: events, loading } = useEvents(filterArg);
 
@@ -650,9 +652,7 @@ export default function EventsPage() {
                   <tr
                     key={event.id}
                     className="border-t border-gray-100 hover:bg-gray-50 group transition cursor-pointer"
-                    onClick={() =>
-                      (window.location.href = `/events/${event.id}`)
-                    }
+                    onClick={() => router.push(`/events/${event.id}`)}
                   >
                     <td className="px-5 py-4">
                       <span className="font-semibold text-gray-900">

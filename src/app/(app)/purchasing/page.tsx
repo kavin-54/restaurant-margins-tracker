@@ -104,7 +104,7 @@ export default function PurchasingPage() {
   const router = useRouter();
   const { data: orders, loading } = useCollection<PurchaseOrder>(
     "purchaseOrders",
-    orderBy("createdAt", "desc")
+    [orderBy("createdAt", "desc")]
   );
   const { data: ingredients } = useIngredients();
   const { data: inventoryItems } = useInventory();

@@ -306,14 +306,12 @@ export default function WastePage() {
     return parseFloat(quantity) * selectedIngredient.costPerUnit;
   }, [selectedIngredient, quantity]);
 
-  const now = new Date();
-  const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() - now.getDay());
-  startOfWeek.setHours(0, 0, 0, 0);
-
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
   const weeklyWaste = useMemo(() => {
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+
     return wasteEntries
       .filter((entry) => {
         const d = typeof (entry.date as any)?.toDate === "function"
@@ -322,9 +320,12 @@ export default function WastePage() {
         return d >= startOfWeek;
       })
       .reduce((sum, e) => sum + (e.totalCost || 0), 0);
-  }, [wasteEntries, startOfWeek]);
+  }, [wasteEntries]);
 
   const monthlyWaste = useMemo(() => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
     return wasteEntries
       .filter((entry) => {
         const d = typeof (entry.date as any)?.toDate === "function"
@@ -333,7 +334,7 @@ export default function WastePage() {
         return d >= startOfMonth;
       })
       .reduce((sum, e) => sum + (e.totalCost || 0), 0);
-  }, [wasteEntries, startOfMonth]);
+  }, [wasteEntries]);
 
   const topReason = useMemo(() => {
     if (wasteEntries.length === 0) return "N/A";

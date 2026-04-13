@@ -31,18 +31,22 @@ export interface VendorRecord {
   notes?: string;
 }
 
-export function useIngredients() {
-  return useCollection<Ingredient>("ingredients", orderBy("name"));
+import { useMemo } from "react";
+
+export function useIngredients(additionalConstraints: QueryConstraint[] = []) {
+  const constraints = useMemo(() => [orderBy("name"), ...additionalConstraints], [additionalConstraints]);
+  return useCollection<Ingredient>("ingredients", constraints);
 }
 
 export function useIngredient(id: string) {
   return useDocument<Ingredient>("ingredients", id);
 }
 
+const VENDOR_RECORDS_ORDER = [orderBy("purchaseDate", "desc")];
 export function useVendorRecords(ingredientId: string) {
   return useCollection<VendorRecord>(
     `ingredients/${ingredientId}/vendorRecords`,
-    orderBy("purchaseDate", "desc")
+    VENDOR_RECORDS_ORDER
   );
 }
 

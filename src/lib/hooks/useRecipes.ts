@@ -32,18 +32,23 @@ export interface Recipe {
   updatedAt: Date;
 }
 
-export function useRecipes() {
-  return useCollection<Recipe>("recipes", orderBy("name"));
+import { useMemo } from "react";
+import { QueryConstraint } from "firebase/firestore";
+
+export function useRecipes(additionalConstraints: QueryConstraint[] = []) {
+  const constraints = useMemo(() => [orderBy("name"), ...additionalConstraints], [additionalConstraints]);
+  return useCollection<Recipe>("recipes", constraints);
 }
 
 export function useRecipe(id: string) {
   return useDocument<Recipe>("recipes", id);
 }
 
+const LINES_ORDER = [orderBy("sortOrder")];
 export function useRecipeLines(recipeId: string) {
   return useCollection<RecipeLine>(
     `recipes/${recipeId}/lines`,
-    orderBy("sortOrder")
+    LINES_ORDER
   );
 }
 

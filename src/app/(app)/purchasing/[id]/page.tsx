@@ -110,7 +110,7 @@ export default function PurchaseOrderDetailPage() {
   );
   const { data: lines, loading: linesLoading } = useCollection<POLine>(
     `purchaseOrders/${id}/lines`,
-    orderBy("ingredientName")
+    [orderBy("ingredientName")]
   );
 
   const [receivingData, setReceivingData] = useState<ReceivingData>({});
@@ -121,7 +121,7 @@ export default function PurchaseOrderDetailPage() {
   // Load price history from other POs for comparison
   const { data: allOrders } = useCollection<PurchaseOrder>(
     "purchaseOrders",
-    orderBy("createdAt", "desc")
+    [orderBy("createdAt", "desc")]
   );
 
   useEffect(() => {

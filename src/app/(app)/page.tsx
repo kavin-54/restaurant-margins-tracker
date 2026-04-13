@@ -8,9 +8,10 @@ import { useIngredients } from "@/lib/hooks/useIngredients";
 import { useInventory } from "@/lib/hooks/useInventory";
 import { useWasteLog } from "@/lib/hooks/useWaste";
 import { useCollection } from "@/lib/hooks/useFirestore";
-import { orderBy } from "firebase/firestore";
+import { orderBy, limit, where } from "firebase/firestore";
 import type { PurchaseOrder } from "@/lib/types/purchaseOrder";
 import { formatCurrency } from "@/lib/utils";
+import Loading from "./loading";
 
 // --- Helpers ---
 
@@ -47,6 +48,14 @@ function startOfMonth(date: Date): Date {
 const AMBIENT_SHADOW = "0px 10px 40px rgba(45,51,53,0.06)";
 const TARGET_FOOD_COST = 35;
 const TARGET_MARGIN = 35;
+
+const STATUS_MAP: Record<string, { label: string; className: string }> = {
+  confirmed: { label: "Confirmed", className: "bg-green-100 text-green-700" },
+  proposal: { label: "Proposed", className: "bg-amber-50 text-amber-700" },
+  inquiry: { label: "In Planning", className: "bg-blue-100 text-blue-700" },
+  completed: { label: "Completed", className: "bg-gray-100 text-gray-700" },
+  cancelled: { label: "Cancelled", className: "bg-red-100 text-red-700" },
+};
 
 // --- Sub-components ---
 
@@ -313,10 +322,10 @@ function RecipeProfitabilitySection({
 }) {
   if (recipes.length === 0) return null;
 
-  const topPerformers = recipes
+  const topPerformers = [...recipes]
     .sort((a, b) => b.marginPct - a.marginPct)
     .slice(0, 5);
-  const underperformers = recipes
+  const underperformers = [...recipes]
     .sort((a, b) => a.marginPct - b.marginPct)
     .slice(0, 5)
     .filter((r) => r.marginPct < 40);
@@ -517,14 +526,21 @@ function QuickActionCard({
 // --- Main Dashboard ---
 
 export default function DashboardPage() {
-  const { data: events, loading: eventsLoading } = useEvents();
-  const { data: recipes, loading: recipesLoading } = useRecipes();
-  const { data: ingredients, loading: ingredientsLoading } = useIngredients();
-  const { data: inventoryItems, loading: inventoryLoading } = useInventory();
-  const { data: wasteEntries, loading: wasteLoading } = useWasteLog();
+  // Memoize constraints to prevent re-subscriptions
+  const recentEventsConstraints = useMemo(() => [limit(50)], []);
+  const topRecipesConstraints = useMemo(() => [limit(20)], []);
+  const inventoryAlertsConstraints = useMemo(() => [limit(100)], []);
+  const recentWasteConstraints = useMemo(() => [limit(50)], []);
+  const poConstraints = useMemo(() => [orderBy("createdAt", "desc"), limit(20)], []);
+
+  const { data: events, loading: eventsLoading } = useEvents(undefined, recentEventsConstraints);
+  const { data: recipes, loading: recipesLoading } = useRecipes(topRecipesConstraints);
+  const { data: ingredients, loading: ingredientsLoading } = useIngredients([limit(50)]);
+  const { data: inventoryItems, loading: inventoryLoading } = useInventory(inventoryAlertsConstraints);
+  const { data: wasteEntries, loading: wasteLoading } = useWasteLog(undefined, recentWasteConstraints);
   const { data: purchaseOrders, loading: posLoading } = useCollection<PurchaseOrder>(
     "purchaseOrders",
-    orderBy("createdAt", "desc")
+    poConstraints
   );
 
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(
@@ -539,15 +555,17 @@ export default function DashboardPage() {
     wasteLoading ||
     posLoading;
 
-  const now = new Date();
-  const todayStart = startOfDay(now);
-  const todayEnd = endOfDay(now);
-  const weekStart = startOfWeek(now);
-  const weekEnd = endOfWeek(now);
-  const monthStart = startOfMonth(now);
+  // Memoize "now" once per mount so date objects are stable across renders
+  const now = useMemo(() => new Date(), []);
 
   // --- Derived metrics ---
   const metrics = useMemo(() => {
+    const todayStartVal = startOfDay(now);
+    const todayEndVal = endOfDay(now);
+    const weekStartVal = startOfWeek(now);
+    const weekEndVal = endOfWeek(now);
+    const monthStartVal = startOfMonth(now);
+
     const allEvents = events ?? [];
     const allWaste = wasteEntries ?? [];
     const allPOs = purchaseOrders ?? [];
@@ -555,19 +573,19 @@ export default function DashboardPage() {
     // Today's events
     const todayEvents = allEvents.filter((e) => {
       const d = new Date(e.eventDate);
-      return d >= todayStart && d <= todayEnd && e.status !== "cancelled";
+      return d >= todayStartVal && d <= todayEndVal && e.status !== "cancelled";
     });
 
     // This week's events
     const weekEvents = allEvents.filter((e) => {
       const d = new Date(e.eventDate);
-      return d >= weekStart && d < weekEnd && e.status !== "cancelled";
+      return d >= weekStartVal && d < weekEndVal && e.status !== "cancelled";
     });
 
     // This month events for food cost calc
     const monthEvents = allEvents.filter((e) => {
       const d = new Date(e.eventDate);
-      return d >= monthStart && d <= now && e.status !== "cancelled";
+      return d >= monthStartVal && d <= now && e.status !== "cancelled";
     });
 
     const todayRevenue = todayEvents.reduce(
@@ -621,7 +639,7 @@ export default function DashboardPage() {
     const weekWasteCost = allWaste
       .filter((w) => {
         const d = new Date(w.date);
-        return d >= weekStart && d < weekEnd;
+        return d >= weekStartVal && d < weekEndVal;
       })
       .reduce((sum, w) => sum + (w.totalCost || 0), 0);
 
@@ -634,9 +652,9 @@ export default function DashboardPage() {
     const todayMeals = todayGuests;
 
     // Week-over-week trend: compare this week revenue with a simple estimate
-    const lastWeekStart = new Date(weekStart);
+    const lastWeekStart = new Date(weekStartVal);
     lastWeekStart.setDate(lastWeekStart.getDate() - 7);
-    const lastWeekEnd = new Date(weekStart);
+    const lastWeekEnd = new Date(weekStartVal);
     const lastWeekRevenue = allEvents
       .filter((e) => {
         const d = new Date(e.eventDate);
@@ -658,7 +676,7 @@ export default function DashboardPage() {
       todayMeals,
       trendUp,
     };
-  }, [events, wasteEntries, purchaseOrders, todayStart, todayEnd, weekStart, weekEnd, monthStart, now]);
+  }, [events, wasteEntries, purchaseOrders, now]);
 
   // --- Recipe profitability ---
   const recipeProfitability = useMemo(() => {
@@ -772,26 +790,12 @@ export default function DashboardPage() {
       .slice(0, 5);
   }, [events, now]);
 
-  const STATUS_MAP: Record<string, { label: string; className: string }> = {
-    confirmed: { label: "Confirmed", className: "bg-green-100 text-green-700" },
-    proposal: { label: "Proposed", className: "bg-amber-50 text-amber-700" },
-    inquiry: { label: "In Planning", className: "bg-blue-100 text-blue-700" },
-    completed: { label: "Completed", className: "bg-gray-100 text-gray-700" },
-    cancelled: { label: "Cancelled", className: "bg-red-100 text-red-700" },
-  };
-
   function handleDismissAlert(id: string) {
     setDismissedAlerts((prev) => new Set([...prev, id]));
   }
 
   if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <span className="material-symbols-outlined animate-spin text-3xl text-blue-600">
-          progress_activity
-        </span>
-      </div>
-    );
+    return <Loading />;
   }
 
   return (

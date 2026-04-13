@@ -6,7 +6,8 @@ import {
   updateDocument,
   deleteDocument,
 } from "@/lib/firebase/firestore";
-import { orderBy, where } from "firebase/firestore";
+import { orderBy, where, QueryConstraint } from "firebase/firestore";
+import { useMemo } from "react";
 
 export type EventStatus = "inquiry" | "proposal" | "confirmed" | "completed" | "cancelled";
 
@@ -37,19 +38,25 @@ export interface Event {
   updatedAt: Date;
 }
 
-export function useEvents(statusFilter?: EventStatus) {
-  const constraints = statusFilter ? [where("status", "==", statusFilter), orderBy("eventDate", "desc")] : [orderBy("eventDate", "desc")];
-  return useCollection<Event>("events", ...constraints);
+export function useEvents(statusFilter?: EventStatus, additionalConstraints: QueryConstraint[] = []) {
+  const constraints = useMemo(() => {
+    const base = statusFilter
+      ? [where("status", "==", statusFilter), orderBy("eventDate", "desc")]
+      : [orderBy("eventDate", "desc")];
+    return [...base, ...additionalConstraints];
+  }, [statusFilter, additionalConstraints]);
+  return useCollection<Event>("events", constraints);
 }
 
 export function useEvent(id: string) {
   return useDocument<Event>("events", id);
 }
 
+const MENU_ITEMS_ORDER = [orderBy("recipeName")];
 export function useEventMenuItems(eventId: string) {
   return useCollection<EventMenuItem>(
     `events/${eventId}/menuItems`,
-    orderBy("recipeName")
+    MENU_ITEMS_ORDER
   );
 }
 

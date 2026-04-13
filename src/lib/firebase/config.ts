@@ -13,14 +13,8 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-console.log("[Firebase] Initializing with project:", firebaseConfig.projectId);
-console.log("[Firebase] Auth domain:", firebaseConfig.authDomain);
-console.time("[Firebase] App init");
-
 // Initialize Firebase (prevent re-initialization in dev hot reload)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-
-console.timeEnd("[Firebase] App init");
 
 export const auth = getAuth(app);
 
@@ -28,18 +22,14 @@ export const auth = getAuth(app);
 let db: Firestore;
 try {
   db = initializeFirestore(app, {
-    experimentalAutoDetectLongPolling: true,
+    experimentalForceLongPolling: true,
   });
-  console.log("[Firebase] Firestore initialized with long-polling");
 } catch {
   // Already initialized (hot reload) — just get the existing instance
   db = getFirestore(app);
-  console.log("[Firebase] Firestore re-used existing instance");
 }
 export { db };
 
 export const storage = getStorage(app);
-
-console.log("[Firebase] Auth, Firestore, Storage ready");
 
 export default app;

@@ -23,8 +23,9 @@ export interface Client {
   updatedAt: Date;
 }
 
+const CLIENTS_ORDER = [orderBy("name")];
 export function useClients() {
-  return useCollection<Client>("clients", orderBy("name"));
+  return useCollection<Client>("clients", CLIENTS_ORDER);
 }
 
 export function useClient(id: string) {

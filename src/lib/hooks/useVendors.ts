@@ -26,8 +26,9 @@ export interface Vendor {
   updatedAt: Date;
 }
 
+const VENDORS_ORDER = [orderBy("name")];
 export function useVendors() {
-  return useCollection<Vendor>("vendors", orderBy("name"));
+  return useCollection<Vendor>("vendors", VENDORS_ORDER);
 }
 
 export function useVendor(id: string) {

@@ -59,7 +59,7 @@ export default function VendorDetailPage() {
   const { data: vendor, loading, error } = useVendor(id);
   const { data: allPOs } = useCollection<PurchaseOrder>(
     "purchaseOrders",
-    orderBy("createdAt", "desc")
+    [orderBy("createdAt", "desc")]
   );
   const { data: allIngredients } = useIngredients();
 
