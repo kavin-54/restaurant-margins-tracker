@@ -1,20 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { collection, doc, onSnapshot, query, QueryConstraint, Timestamp } from "firebase/firestore";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { collection, doc, getDoc, getDocs, query, QueryConstraint, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 
 // Convert Firestore Timestamps to JS Dates recursively
 function convertTimestamps(obj: any): any {
   if (obj === null || typeof obj !== "object") return obj;
-
-  if (obj instanceof Timestamp) {
-    return obj.toDate();
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(convertTimestamps);
-  }
+  if (obj instanceof Timestamp) return obj.toDate();
+  if (Array.isArray(obj)) return obj.map(convertTimestamps);
 
   const result: Record<string, any> = {};
   for (const key in obj) {
@@ -25,20 +19,18 @@ function convertTimestamps(obj: any): any {
   return result;
 }
 
-type LoadStatus = "loading" | "ready" | "timeout" | "error";
-
 interface UseCollectionResult<T> {
   data: T[];
   loading: boolean;
   error: Error | null;
-  status: LoadStatus;
+  refetch: () => void;
 }
 
 interface UseDocumentResult<T> {
   data: T | null;
   loading: boolean;
   error: Error | null;
-  status: LoadStatus;
+  refetch: () => void;
 }
 
 export function useCollection<T>(
@@ -46,91 +38,61 @@ export function useCollection<T>(
   constraints: QueryConstraint[] = [],
 ): UseCollectionResult<T> {
   const [data, setData] = useState<T[]>([]);
-  const [status, setStatus] = useState<LoadStatus>("loading");
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [fetchCount, setFetchCount] = useState(0);
 
-  // Serialize constraints to a stable key for the dependency array
-  // This helps prevent infinite re-subscription loops
   const constraintKey = useMemo(() => {
     try {
       return constraints.map(c => {
-        // String(c) in Firestore usually returns something like "QueryConstraint(type=limit, value=50)"
-        // if not, we try to extract a type and value
         const str = String(c);
-        if (str !== "[object Object]") return str;
-        
-        // Fallback for objects - try to get a stable representation
-        // We'll use the constructor name or a generic key
-        return c.constructor?.name || "Constraint";
+        return str !== "[object Object]" ? str : (c.constructor?.name || "Constraint");
       }).join("|");
-    } catch (e) {
+    } catch {
       return "base-query";
     }
   }, [constraints]);
 
-  const loading = status === "loading" || status === "timeout";
+  const refetch = useCallback(() => setFetchCount(n => n + 1), []);
 
   useEffect(() => {
     if (!collectionPath) {
       setData([]);
-      setStatus("ready");
+      setLoading(false);
       return;
     }
 
-    setStatus("loading");
+    let cancelled = false;
+    setLoading(true);
     setError(null);
 
-    // Safety timeout — show "still loading" state after 5 seconds
-    const timeout = setTimeout(() => {
-      setStatus(prev => (prev === "loading" ? "timeout" : prev));
-    }, 5000);
+    async function fetchData() {
+      try {
+        const collectionRef = collection(db, collectionPath);
+        const q = query(collectionRef, ...constraints);
+        const snapshot = await getDocs(q);
+        if (cancelled) return;
 
-    let unsubscribe: () => void;
-
-    try {
-      const collectionRef = collection(db, collectionPath);
-      const q = query(collectionRef, ...constraints);
-
-      unsubscribe = onSnapshot(
-        q,
-        (snapshot) => {
-          clearTimeout(timeout);
-          try {
-            const docs = snapshot.docs.map((d) => ({
-              id: d.id,
-              ...convertTimestamps(d.data()),
-            } as T));
-            setData(docs);
-            setError(null);
-            setStatus("ready");
-          } catch (err) {
-            console.error(`Error processing snapshot for ${collectionPath}:`, err);
-            setError(err instanceof Error ? err : new Error(String(err)));
-            setStatus("error");
-          }
-        },
-        (err) => {
-          clearTimeout(timeout);
-          console.error(`Firestore subscription error for ${collectionPath}:`, err);
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setStatus("error");
-        }
-      );
-    } catch (err) {
-      clearTimeout(timeout);
-      console.error(`Error initializing subscription for ${collectionPath}:`, err);
-      setError(err instanceof Error ? err : new Error(String(err)));
-      setStatus("error");
+        const docs = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...convertTimestamps(d.data()),
+        } as T));
+        setData(docs);
+        setError(null);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err : new Error(String(err)));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
 
-    return () => {
-      clearTimeout(timeout);
-      if (unsubscribe) unsubscribe();
-    };
+    fetchData();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collectionPath, constraintKey]);
+  }, [collectionPath, constraintKey, fetchCount]);
 
-  return { data, loading, error, status };
+  return { data, loading, error, refetch };
 }
 
 export function useDocument<T>(
@@ -138,71 +100,49 @@ export function useDocument<T>(
   docId: string
 ): UseDocumentResult<T> {
   const [data, setData] = useState<T | null>(null);
-  const [status, setStatus] = useState<LoadStatus>("loading");
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [fetchCount, setFetchCount] = useState(0);
 
-  const loading = status === "loading" || status === "timeout";
+  const refetch = useCallback(() => setFetchCount(n => n + 1), []);
 
   useEffect(() => {
     if (!docId) {
       setData(null);
-      setStatus("ready");
+      setLoading(false);
       return;
     }
 
-    setStatus("loading");
+    let cancelled = false;
+    setLoading(true);
     setError(null);
 
-    // Safety timeout
-    const timeout = setTimeout(() => {
-      setStatus(prev => (prev === "loading" ? "timeout" : prev));
-    }, 5000);
+    async function fetchData() {
+      try {
+        const docRef = doc(db, collectionPath, docId);
+        const snapshot = await getDoc(docRef);
+        if (cancelled) return;
 
-    let unsubscribe: () => void;
-
-    try {
-      const docRef = doc(db, collectionPath, docId);
-
-      unsubscribe = onSnapshot(
-        docRef,
-        (snapshot) => {
-          clearTimeout(timeout);
-          try {
-            if (snapshot.exists()) {
-              setData({
-                id: snapshot.id,
-                ...convertTimestamps(snapshot.data()),
-              } as T);
-            } else {
-              setData(null);
-            }
-            setError(null);
-            setStatus("ready");
-          } catch (err) {
-            console.error(`Error processing doc snapshot for ${collectionPath}/${docId}:`, err);
-            setError(err instanceof Error ? err : new Error(String(err)));
-            setStatus("error");
-          }
-        },
-        (err) => {
-          clearTimeout(timeout);
-          console.error(`Firestore doc subscription error for ${collectionPath}/${docId}:`, err);
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setStatus("error");
+        if (snapshot.exists()) {
+          setData({
+            id: snapshot.id,
+            ...convertTimestamps(snapshot.data()),
+          } as T);
+        } else {
+          setData(null);
         }
-      );
-    } catch (err) {
-      clearTimeout(timeout);
-      console.error(`Error initializing doc subscription for ${collectionPath}/${docId}:`, err);
-      setError(err instanceof Error ? err : new Error(String(err)));
-      setStatus("error");
+        setError(null);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err : new Error(String(err)));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
 
-    return () => {
-      clearTimeout(timeout);
-      if (unsubscribe) unsubscribe();
-    };
-  }, [collectionPath, docId]);
+    fetchData();
+    return () => { cancelled = true; };
+  }, [collectionPath, docId, fetchCount]);
 
-  return { data, loading, error, status };
+  return { data, loading, error, refetch };
 }

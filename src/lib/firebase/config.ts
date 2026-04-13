@@ -21,9 +21,7 @@ export const auth = getAuth(app);
 // Initialize Firestore — use getFirestore on re-init (hot reload), initializeFirestore on first init
 let db: Firestore;
 try {
-  db = initializeFirestore(app, {
-    experimentalAutoDetectLongPolling: true,
-  });
+  db = initializeFirestore(app, {});
 } catch {
   // Already initialized (hot reload) — just get the existing instance
   db = getFirestore(app);
