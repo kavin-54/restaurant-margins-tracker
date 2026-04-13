@@ -22,15 +22,15 @@ function convertTimestamps(obj: any): any {
 }
 
 // Wait for Firebase Auth to have a current user before making Firestore calls
-function waitForAuth(): Promise<void> {
+function waitForAuth(): Promise<boolean> {
   return new Promise((resolve) => {
     if (auth.currentUser) {
-      resolve();
+      resolve(true);
       return;
     }
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       unsubscribe();
-      resolve();
+      resolve(!!user);
     });
   });
 }
@@ -82,15 +82,30 @@ export function useCollection<T>(
     setLoading(true);
     setError(null);
 
+    const t0 = performance.now();
+    console.log(`[⏱ Firestore] useCollection("${collectionPath}") — starting fetch`);
+
     async function fetchData() {
       try {
         // Wait for auth to be ready so Firestore requests include the auth token
-        await waitForAuth();
+        const hasUser = await waitForAuth();
+        const tAuth = performance.now();
+        console.log(`[⏱ Firestore] useCollection("${collectionPath}") — auth ready in ${(tAuth - t0).toFixed(1)}ms (user=${hasUser}, uid=${auth.currentUser?.uid || "null"})`);
         if (cancelled) return;
+
+        if (!hasUser) {
+          console.warn(`[⏱ Firestore] useCollection("${collectionPath}") — NO USER, skipping fetch`);
+          setData([]);
+          return;
+        }
 
         const collectionRef = collection(db, collectionPath);
         const q = query(collectionRef, ...constraints);
+        console.log(`[⏱ Firestore] useCollection("${collectionPath}") — calling getDocs...`);
+
         const snapshot = await getDocs(q);
+        const tDocs = performance.now();
+        console.log(`[⏱ Firestore] useCollection("${collectionPath}") — getDocs returned ${snapshot.size} docs in ${(tDocs - tAuth).toFixed(1)}ms (total ${(tDocs - t0).toFixed(1)}ms)`);
         if (cancelled) return;
 
         const docs = snapshot.docs.map((d) => ({
@@ -100,10 +115,15 @@ export function useCollection<T>(
         setData(docs);
         setError(null);
       } catch (err) {
+        const tErr = performance.now();
+        console.error(`[⏱ Firestore] useCollection("${collectionPath}") — ERROR in ${(tErr - t0).toFixed(1)}ms:`, err instanceof Error ? err.message : err);
         if (cancelled) return;
         setError(err instanceof Error ? err : new Error(String(err)));
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          console.log(`[⏱ Firestore] useCollection("${collectionPath}") — done, loading=false at ${(performance.now() - t0).toFixed(1)}ms`);
+        }
       }
     }
 
@@ -137,13 +157,26 @@ export function useDocument<T>(
     setLoading(true);
     setError(null);
 
+    const t0 = performance.now();
+    console.log(`[⏱ Firestore] useDocument("${collectionPath}/${docId}") — starting fetch`);
+
     async function fetchData() {
       try {
-        await waitForAuth();
+        const hasUser = await waitForAuth();
+        const tAuth = performance.now();
+        console.log(`[⏱ Firestore] useDocument("${collectionPath}/${docId}") — auth ready in ${(tAuth - t0).toFixed(1)}ms (user=${hasUser})`);
         if (cancelled) return;
+
+        if (!hasUser) {
+          console.warn(`[⏱ Firestore] useDocument("${collectionPath}/${docId}") — NO USER, skipping fetch`);
+          setData(null);
+          return;
+        }
 
         const docRef = doc(db, collectionPath, docId);
         const snapshot = await getDoc(docRef);
+        const tDoc = performance.now();
+        console.log(`[⏱ Firestore] useDocument("${collectionPath}/${docId}") — getDoc returned exists=${snapshot.exists()} in ${(tDoc - tAuth).toFixed(1)}ms (total ${(tDoc - t0).toFixed(1)}ms)`);
         if (cancelled) return;
 
         if (snapshot.exists()) {
@@ -156,10 +189,15 @@ export function useDocument<T>(
         }
         setError(null);
       } catch (err) {
+        const tErr = performance.now();
+        console.error(`[⏱ Firestore] useDocument("${collectionPath}/${docId}") — ERROR in ${(tErr - t0).toFixed(1)}ms:`, err instanceof Error ? err.message : err);
         if (cancelled) return;
         setError(err instanceof Error ? err : new Error(String(err)));
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          console.log(`[⏱ Firestore] useDocument("${collectionPath}/${docId}") — done, loading=false at ${(performance.now() - t0).toFixed(1)}ms`);
+        }
       }
     }
 

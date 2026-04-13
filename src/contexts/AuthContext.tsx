@@ -23,18 +23,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Auth listener — subscribe once, not on every route change
   useEffect(() => {
+    const authStart = performance.now();
+    console.log(`[⏱ Auth] useEffect running, subscribing to onAuthChange`);
     let timeout: NodeJS.Timeout;
 
     // Safety timeout — if Firebase Auth doesn't respond in 1 second, stop loading
     timeout = setTimeout(() => {
+      console.warn(`[⏱ Auth] TIMEOUT after 1s — no auth response, forcing loading=false`);
       setLoading(false);
     }, 1000);
 
     const unsubscribe = onAuthChange(async (firebaseUser: User | null) => {
       clearTimeout(timeout);
+      const elapsed = (performance.now() - authStart).toFixed(1);
 
       if (firebaseUser) {
-        // Set user IMMEDIATELY from Firebase Auth — don't block on Firestore
+        console.log(`[⏱ Auth] User received in ${elapsed}ms — uid=${firebaseUser.uid}, email=${firebaseUser.email}`);
         const authUser: AppUser = {
           uid: firebaseUser.uid,
           email: firebaseUser.email || "",
@@ -43,18 +47,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
         setUser(authUser);
         setLoading(false);
+        console.log(`[⏱ Auth] loading=false set at ${(performance.now() - authStart).toFixed(1)}ms`);
 
         // Fetch Firestore user doc in the background to get real role
+        const bgStart = performance.now();
         getDocument<AppUser>("users", firebaseUser.uid)
           .then((userDoc) => {
             if (userDoc) {
+              console.log(`[⏱ Auth] Background user doc fetched in ${(performance.now() - bgStart).toFixed(1)}ms, role=${userDoc.role}`);
               setUser(userDoc);
+            } else {
+              console.log(`[⏱ Auth] Background user doc not found (${(performance.now() - bgStart).toFixed(1)}ms)`);
             }
           })
-          .catch(() => {
-            // Firestore user doc fetch failed — keep using auth-derived user
+          .catch((err) => {
+            console.warn(`[⏱ Auth] Background user doc FAILED in ${(performance.now() - bgStart).toFixed(1)}ms:`, err.message || err);
           });
       } else {
+        console.log(`[⏱ Auth] No user (signed out) at ${elapsed}ms`);
         setUser(null);
         setLoading(false);
       }
@@ -69,6 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Handle routing separately — redirect to login when not authenticated
   useEffect(() => {
     if (!loading && !user && pathname !== "/login") {
+      console.log(`[⏱ Auth] Redirecting to /login (no user, pathname=${pathname})`);
       router.push("/login");
     }
   }, [loading, user, pathname, router]);

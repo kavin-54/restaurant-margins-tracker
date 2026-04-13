@@ -3,6 +3,8 @@ import { getAuth } from "firebase/auth";
 import { getFirestore, initializeFirestore, Firestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
+const t0 = performance.now();
+
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -13,10 +15,14 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
+console.log(`[⏱ Config] project=${firebaseConfig.projectId}, authDomain=${firebaseConfig.authDomain}`);
+
 // Initialize Firebase (prevent re-initialization in dev hot reload)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+console.log(`[⏱ Config] App init: ${(performance.now() - t0).toFixed(1)}ms`);
 
 export const auth = getAuth(app);
+console.log(`[⏱ Config] Auth init: ${(performance.now() - t0).toFixed(1)}ms`);
 
 // Initialize Firestore — use getFirestore on re-init (hot reload), initializeFirestore on first init
 let db: Firestore;
@@ -29,7 +35,9 @@ try {
   db = getFirestore(app);
 }
 export { db };
+console.log(`[⏱ Config] Firestore init: ${(performance.now() - t0).toFixed(1)}ms`);
 
 export const storage = getStorage(app);
+console.log(`[⏱ Config] All services ready: ${(performance.now() - t0).toFixed(1)}ms`);
 
 export default app;
