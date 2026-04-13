@@ -21,8 +21,12 @@ function getStatusBadge(vendor: { notes?: string }) {
   return { label: "Active", classes: "bg-green-100 text-green-700" };
 }
 
+import { limit } from "firebase/firestore";
+import Loading from "../loading";
+
 export default function VendorsPage() {
-  const { data: vendors, loading, error } = useVendors();
+  const constraints = useMemo(() => [limit(100)], []);
+  const { data: vendors, loading, error } = useVendors(constraints);
   const { toast } = useToast();
   const [search, setSearch] = useState("");
 
@@ -54,7 +58,7 @@ export default function VendorsPage() {
     }
   }
 
-  if (loading) return <LoadingScreen />;
+  if (loading) return <Loading />;
   if (error) {
     return (
       <div className="p-6 text-red-600">

@@ -22,7 +22,7 @@ export const auth = getAuth(app);
 let db: Firestore;
 try {
   db = initializeFirestore(app, {
-    experimentalForceLongPolling: true,
+    experimentalAutoDetectLongPolling: true,
   });
 } catch {
   // Already initialized (hot reload) — just get the existing instance

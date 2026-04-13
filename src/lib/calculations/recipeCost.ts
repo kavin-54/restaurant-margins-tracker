@@ -44,12 +44,19 @@ export interface RecipeCostResult {
  */
 export interface RecipeLine {
   id: string;
-  ingredientId: string; // Used as referenceId for both ingredients and sub-recipes
+  ingredientId: string;
   type?: "ingredient" | "sub-recipe";
   quantity: number;
   unit: string;
   costPerUnit: number;
   lineCost: number;
+}
+
+/**
+ * Explicit sub-recipe line for architectural clarity
+ */
+export interface SubRecipeLine extends Omit<RecipeLine, "type"> {
+  type: "sub-recipe";
 }
 
 /**
