@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore, initializeFirestore, Firestore } from "firebase/firestore";
+import { getFirestore, initializeFirestore, memoryLocalCache, Firestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const t0 = performance.now();
@@ -24,11 +24,18 @@ console.log(`[⏱ Config] App init: ${(performance.now() - t0).toFixed(1)}ms`);
 export const auth = getAuth(app);
 console.log(`[⏱ Config] Auth init: ${(performance.now() - t0).toFixed(1)}ms`);
 
-// Initialize Firestore — use getFirestore on re-init (hot reload), initializeFirestore on first init
+// Initialize Firestore with:
+// - experimentalForceLongPolling: Vercel blocks WebSocket connections to firestore.googleapis.com.
+//   Without this, the SDK tries WebSocket first, hangs ~38s, then falls back. Forcing long polling
+//   skips the broken WebSocket attempt entirely.
+// - memoryLocalCache: Disables IndexedDB persistence. Without this, when the SDK is "offline"
+//   (during the WebSocket hang), getDocs silently returns 0 docs from the empty local cache
+//   instead of erroring. Memory-only cache ensures we always hit the network.
 let db: Firestore;
 try {
   db = initializeFirestore(app, {
     experimentalForceLongPolling: true,
+    localCache: memoryLocalCache(),
   });
 } catch {
   // Already initialized (hot reload) — just get the existing instance
