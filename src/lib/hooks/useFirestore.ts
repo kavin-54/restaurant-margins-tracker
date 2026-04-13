@@ -1,8 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, doc, onSnapshot, query, QueryConstraint } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, QueryConstraint, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
+
+// Convert Firestore Timestamps to JS Dates recursively
+function convertTimestamps(obj: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value instanceof Timestamp) {
+      result[key] = value.toDate();
+    } else if (value && typeof value === "object" && !Array.isArray(value)) {
+      result[key] = convertTimestamps(value as Record<string, unknown>);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
 
 interface UseCollectionResult<T> {
   data: T[];
@@ -48,7 +63,7 @@ export function useCollection<T>(
           try {
             const docs = snapshot.docs.map((d) => ({
               id: d.id,
-              ...d.data(),
+              ...convertTimestamps(d.data() as Record<string, unknown>),
             } as T));
             console.log(`[Firestore] useCollection("${collectionPath}") got ${docs.length} docs`);
             setData(docs);
@@ -123,7 +138,7 @@ export function useDocument<T>(
               console.log(`[Firestore] useDocument("${collectionPath}/${docId}") doc found`);
               setData({
                 id: snapshot.id,
-                ...snapshot.data(),
+                ...convertTimestamps(snapshot.data() as Record<string, unknown>),
               } as T);
             } else {
               console.log(`[Firestore] useDocument("${collectionPath}/${docId}") doc not found`);
