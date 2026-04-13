@@ -50,16 +50,21 @@ export function useCollection<T>(
   const [error, setError] = useState<Error | null>(null);
 
   // Serialize constraints to a stable key for the dependency array
-  // Use a more robust serialization for complex constraints
+  // This helps prevent infinite re-subscription loops
   const constraintKey = useMemo(() => {
     try {
-      return JSON.stringify(constraints.map(c => {
-        // Handle cases where c might have a toString or internal structure
+      return constraints.map(c => {
+        // String(c) in Firestore usually returns something like "QueryConstraint(type=limit, value=50)"
+        // if not, we try to extract a type and value
         const str = String(c);
-        return str.includes("[object Object]") ? Math.random().toString() : str;
-      }));
+        if (str !== "[object Object]") return str;
+        
+        // Fallback for objects - try to get a stable representation
+        // We'll use the constructor name or a generic key
+        return c.constructor?.name || "Constraint";
+      }).join("|");
     } catch (e) {
-      return Math.random().toString();
+      return "base-query";
     }
   }, [constraints]);
 

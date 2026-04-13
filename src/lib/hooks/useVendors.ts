@@ -26,9 +26,12 @@ export interface Vendor {
   updatedAt: Date;
 }
 
-const VENDORS_ORDER = [orderBy("name")];
-export function useVendors() {
-  return useCollection<Vendor>("vendors", VENDORS_ORDER);
+import { useMemo } from "react";
+import { QueryConstraint } from "firebase/firestore";
+
+export function useVendors(additionalConstraints: QueryConstraint[] = []) {
+  const constraints = useMemo(() => [orderBy("name"), ...additionalConstraints], [additionalConstraints]);
+  return useCollection<Vendor>("vendors", constraints);
 }
 
 export function useVendor(id: string) {

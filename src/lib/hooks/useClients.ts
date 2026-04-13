@@ -23,9 +23,12 @@ export interface Client {
   updatedAt: Date;
 }
 
-const CLIENTS_ORDER = [orderBy("name")];
-export function useClients() {
-  return useCollection<Client>("clients", CLIENTS_ORDER);
+import { useMemo } from "react";
+import { QueryConstraint } from "firebase/firestore";
+
+export function useClients(additionalConstraints: QueryConstraint[] = []) {
+  const constraints = useMemo(() => [orderBy("name"), ...additionalConstraints], [additionalConstraints]);
+  return useCollection<Client>("clients", constraints);
 }
 
 export function useClient(id: string) {
