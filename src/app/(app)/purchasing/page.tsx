@@ -670,7 +670,7 @@ export default function PurchasingPage() {
                   />
                 </div>
                 <div className="flex justify-between mt-1">
-                  <span className="text-[10px] text-gray-400 font-medium">$0</span>
+                  <span className="text-[10px] text-gray-400 font-medium">₹0</span>
                   <span className="text-[10px] text-gray-400 font-medium">
                     {formatCurrency(WEEKLY_BUDGET)}
                   </span>
