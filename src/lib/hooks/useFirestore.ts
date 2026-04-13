@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { collection, doc, getDoc, getDocs, query, QueryConstraint, Timestamp } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 import { db } from "@/lib/firebase/config";
+import { auth } from "@/lib/firebase/config";
 
 // Convert Firestore Timestamps to JS Dates recursively
 function convertTimestamps(obj: any): any {
@@ -17,6 +19,20 @@ function convertTimestamps(obj: any): any {
     }
   }
   return result;
+}
+
+// Wait for Firebase Auth to have a current user before making Firestore calls
+function waitForAuth(): Promise<void> {
+  return new Promise((resolve) => {
+    if (auth.currentUser) {
+      resolve();
+      return;
+    }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe();
+      resolve();
+    });
+  });
 }
 
 interface UseCollectionResult<T> {
@@ -68,6 +84,10 @@ export function useCollection<T>(
 
     async function fetchData() {
       try {
+        // Wait for auth to be ready so Firestore requests include the auth token
+        await waitForAuth();
+        if (cancelled) return;
+
         const collectionRef = collection(db, collectionPath);
         const q = query(collectionRef, ...constraints);
         const snapshot = await getDocs(q);
@@ -119,6 +139,9 @@ export function useDocument<T>(
 
     async function fetchData() {
       try {
+        await waitForAuth();
+        if (cancelled) return;
+
         const docRef = doc(db, collectionPath, docId);
         const snapshot = await getDoc(docRef);
         if (cancelled) return;
