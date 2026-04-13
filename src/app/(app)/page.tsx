@@ -529,13 +529,14 @@ export default function DashboardPage() {
   // Memoize constraints to prevent re-subscriptions
   const recentEventsConstraints = useMemo(() => [limit(50)], []);
   const topRecipesConstraints = useMemo(() => [limit(20)], []);
+  const ingredientsConstraints = useMemo(() => [limit(50)], []);
   const inventoryAlertsConstraints = useMemo(() => [limit(100)], []);
   const recentWasteConstraints = useMemo(() => [limit(50)], []);
   const poConstraints = useMemo(() => [orderBy("createdAt", "desc"), limit(20)], []);
 
   const { data: events, loading: eventsLoading } = useEvents(undefined, recentEventsConstraints);
   const { data: recipes, loading: recipesLoading } = useRecipes(topRecipesConstraints);
-  const { data: ingredients, loading: ingredientsLoading } = useIngredients([limit(50)]);
+  const { data: ingredients, loading: ingredientsLoading } = useIngredients(ingredientsConstraints);
   const { data: inventoryItems, loading: inventoryLoading } = useInventory(inventoryAlertsConstraints);
   const { data: wasteEntries, loading: wasteLoading } = useWasteLog(undefined, recentWasteConstraints);
   const { data: purchaseOrders, loading: posLoading } = useCollection<PurchaseOrder>(

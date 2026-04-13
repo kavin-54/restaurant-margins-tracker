@@ -55,8 +55,12 @@ const categoryBadgeColors: Record<string, string> = {
 
 const VISIBLE_COUNT = 9;
 
+import { limit } from "firebase/firestore";
+import Loading from "../loading";
+
 export default function RecipesPage() {
-  const { data: recipes, loading } = useRecipes();
+  const constraints = useMemo(() => [limit(100)], []);
+  const { data: recipes, loading } = useRecipes(constraints);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sortBy, setSortBy] = useState("name");
   const [showAll, setShowAll] = useState(false);
@@ -85,7 +89,7 @@ export default function RecipesPage() {
 
   const visible = showAll ? filtered : filtered.slice(0, VISIBLE_COUNT);
 
-  if (loading) return <LoadingScreen />;
+  if (loading) return <Loading />;
 
   return (
     <div>

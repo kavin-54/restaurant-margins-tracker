@@ -74,10 +74,14 @@ function getStockIndicator(costPerUnit: number): { color: string; label: string 
   return { color: "bg-red-500", label: "Critical" };
 }
 
+import { limit } from "firebase/firestore";
+import Loading from "../loading";
+
 const ITEMS_PER_PAGE = 15;
 
 export default function IngredientsPage() {
-  const { data: ingredients, loading, error } = useIngredients();
+  const constraints = useMemo(() => [limit(200)], []);
+  const { data: ingredients, loading, error } = useIngredients(constraints);
   const { toast } = useToast();
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("name-asc");
@@ -158,7 +162,7 @@ export default function IngredientsPage() {
     }
   }
 
-  if (loading) return <LoadingScreen />;
+  if (loading) return <Loading />;
   if (error) {
     return (
       <div className="p-6 text-red-600">

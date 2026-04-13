@@ -98,13 +98,17 @@ interface VendorAggregation {
   totalEstimatedCost: number;
 }
 
+import { limit, where } from "firebase/firestore";
+import Loading from "../loading";
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function PurchasingPage() {
   const router = useRouter();
+  const poConstraints = useMemo(() => [orderBy("createdAt", "desc"), limit(100)], []);
   const { data: orders, loading } = useCollection<PurchaseOrder>(
     "purchaseOrders",
-    [orderBy("createdAt", "desc")]
+    poConstraints
   );
   const { data: ingredients } = useIngredients();
   const { data: inventoryItems } = useInventory();
@@ -530,7 +534,7 @@ export default function PurchasingPage() {
 
   // ─── Render ─────────────────────────────────────────────────────────────
 
-  if (loading) return <LoadingScreen />;
+  if (loading) return <Loading />;
 
   return (
     <div>
