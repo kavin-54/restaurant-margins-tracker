@@ -36,6 +36,25 @@ import {
   type RecipeLine,
 } from "@/lib/hooks/useRecipes";
 import { useIngredients } from "@/lib/hooks/useIngredients";
+import { UNITS, getUnit } from "@/lib/constants/units";
+
+function convertCostPerUnit(
+  baseUnit: string,
+  baseCostPerUnit: number,
+  targetUnit: string,
+): number {
+  if (baseUnit === targetUnit) return baseCostPerUnit;
+  const base = getUnit(baseUnit);
+  const target = getUnit(targetUnit);
+  if (!base || !target || base.type !== target.type) return baseCostPerUnit;
+  return baseCostPerUnit * (target.toBase / base.toBase);
+}
+
+function unitsForIngredient(ingredientUnit: string) {
+  const base = getUnit(ingredientUnit);
+  if (!base) return UNITS;
+  return UNITS.filter((u) => u.type === base.type);
+}
 
 const CATEGORIES = [
   { value: "appetizer", label: "Appetizer" },
@@ -89,9 +108,11 @@ export default function RecipeDetailPage() {
 
   const [lineIngredientId, setLineIngredientId] = useState("");
   const [lineQuantity, setLineQuantity] = useState("");
+  const [lineUnit, setLineUnit] = useState("");
   const [lineNotes, setLineNotes] = useState("");
 
   const [editLineQuantity, setEditLineQuantity] = useState("");
+  const [editLineUnit, setEditLineUnit] = useState("");
   const [editLineNotes, setEditLineNotes] = useState("");
 
   useEffect(() => {
@@ -186,7 +207,13 @@ export default function RecipeDetailPage() {
     const ingredient = ingredients?.find((i) => i.id === lineIngredientId);
     if (!ingredient) return;
 
-    const lineCost = qty * ingredient.costPerUnit;
+    const chosenUnit = lineUnit || ingredient.unit;
+    const convertedCostPerUnit = convertCostPerUnit(
+      ingredient.unit,
+      ingredient.costPerUnit,
+      chosenUnit,
+    );
+    const lineCost = qty * convertedCostPerUnit;
     const maxSort = (lines || []).reduce(
       (max, l) => Math.max(max, l.sortOrder),
       0
@@ -197,8 +224,8 @@ export default function RecipeDetailPage() {
         ingredientId: ingredient.id,
         ingredientName: ingredient.name,
         quantity: qty,
-        unit: ingredient.unit,
-        costPerUnit: ingredient.costPerUnit,
+        unit: chosenUnit,
+        costPerUnit: convertedCostPerUnit,
         lineCost,
         sortOrder: maxSort + 1,
         notes: lineNotes.trim() || undefined,
@@ -225,16 +252,25 @@ export default function RecipeDetailPage() {
       return;
     }
 
-    const lineCost = qty * line.costPerUnit;
+    const ingredient = ingredients?.find((i) => i.id === line.ingredientId);
+    const chosenUnit = editLineUnit || line.unit;
+    const convertedCostPerUnit = ingredient
+      ? convertCostPerUnit(ingredient.unit, ingredient.costPerUnit, chosenUnit)
+      : line.costPerUnit;
+    const lineCost = qty * convertedCostPerUnit;
     try {
       await updateRecipeLine(recipeId, line.id, {
         quantity: qty,
+        unit: chosenUnit,
+        costPerUnit: convertedCostPerUnit,
         lineCost,
         notes: editLineNotes.trim() || undefined,
       });
 
       const updatedLines = (lines || []).map((l) =>
-        l.id === line.id ? { ...l, quantity: qty, lineCost } : l
+        l.id === line.id
+          ? { ...l, quantity: qty, unit: chosenUnit, costPerUnit: convertedCostPerUnit, lineCost }
+          : l
       );
       await recalculateCosts(updatedLines);
 
@@ -261,13 +297,21 @@ export default function RecipeDetailPage() {
   function resetLineForm() {
     setLineIngredientId("");
     setLineQuantity("");
+    setLineUnit("");
     setLineNotes("");
   }
 
   function startEditLine(line: RecipeLine) {
     setEditingLineId(line.id);
     setEditLineQuantity(String(line.quantity));
+    setEditLineUnit(line.unit);
     setEditLineNotes(line.notes || "");
+  }
+
+  function handleIngredientChange(id: string) {
+    setLineIngredientId(id);
+    const ing = ingredients?.find((i) => i.id === id);
+    setLineUnit(ing?.unit ?? "");
   }
 
   const totalCost = (lines || []).reduce((sum, l) => sum + l.lineCost, 0);
@@ -449,7 +493,7 @@ export default function RecipeDetailPage() {
                     <div className="space-y-4 pt-2">
                       <div className="space-y-2">
                         <Label>Ingredient</Label>
-                        <Select value={lineIngredientId} onValueChange={setLineIngredientId}>
+                        <Select value={lineIngredientId} onValueChange={handleIngredientChange}>
                           <SelectTrigger>
                             <SelectValue placeholder="Select ingredient" />
                           </SelectTrigger>
@@ -462,21 +506,42 @@ export default function RecipeDetailPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-2">
-                        <Label>Quantity</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="any"
-                          placeholder="e.g., 2.5"
-                          value={lineQuantity}
-                          onChange={(e) => setLineQuantity(e.target.value)}
-                        />
-                        {lineIngredientId && (
-                          <p className="text-xs text-gray-400">
-                            Unit: {ingredients?.find((i) => i.id === lineIngredientId)?.unit}
-                          </p>
-                        )}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label>Quantity</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="any"
+                            placeholder="e.g., 2.5"
+                            value={lineQuantity}
+                            onChange={(e) => setLineQuantity(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Unit</Label>
+                          <Select
+                            value={lineUnit}
+                            onValueChange={setLineUnit}
+                            disabled={!lineIngredientId}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Unit" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(lineIngredientId
+                                ? unitsForIngredient(
+                                    ingredients?.find((i) => i.id === lineIngredientId)?.unit ?? "",
+                                  )
+                                : UNITS
+                              ).map((u) => (
+                                <SelectItem key={u.value} value={u.value}>
+                                  {u.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <Label>Notes (optional)</Label>
@@ -530,6 +595,13 @@ export default function RecipeDetailPage() {
                         {lines.map((line) => (
                           <tr key={line.id} className="border-b border-gray-50 last:border-0">
                             {editingLineId === line.id ? (
+                              (() => {
+                                const editIng = ingredients?.find((i) => i.id === line.ingredientId);
+                                const editCostPerUnit = editIng
+                                  ? convertCostPerUnit(editIng.unit, editIng.costPerUnit, editLineUnit || line.unit)
+                                  : line.costPerUnit;
+                                const editUnitOptions = editIng ? unitsForIngredient(editIng.unit) : UNITS;
+                                return (
                               <>
                                 <td className="py-3 text-sm font-medium text-gray-900">{line.ingredientName}</td>
                                 <td className="py-3">
@@ -542,10 +614,23 @@ export default function RecipeDetailPage() {
                                     onChange={(e) => setEditLineQuantity(e.target.value)}
                                   />
                                 </td>
-                                <td className="py-3 text-sm text-gray-500">{line.unit}</td>
-                                <td className="py-3 text-sm text-gray-500">{formatCurrency(line.costPerUnit)}</td>
+                                <td className="py-3">
+                                  <Select value={editLineUnit} onValueChange={setEditLineUnit}>
+                                    <SelectTrigger className="h-8 w-[90px]">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {editUnitOptions.map((u) => (
+                                        <SelectItem key={u.value} value={u.value}>
+                                          {u.value}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </td>
+                                <td className="py-3 text-sm text-gray-500">{formatCurrency(editCostPerUnit)}</td>
                                 <td className="py-3 text-sm font-bold text-blue-700">
-                                  {formatCurrency(Number(editLineQuantity) * line.costPerUnit)}
+                                  {formatCurrency(Number(editLineQuantity) * editCostPerUnit)}
                                 </td>
                                 <td className="py-3">
                                   <Input
@@ -572,6 +657,8 @@ export default function RecipeDetailPage() {
                                   </div>
                                 </td>
                               </>
+                                );
+                              })()
                             ) : (
                               <>
                                 <td className="py-3 text-sm font-medium text-gray-900">{line.ingredientName}</td>
