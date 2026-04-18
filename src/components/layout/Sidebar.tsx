@@ -18,6 +18,7 @@ const navItems = [
   { href: "/events/prep", label: "Prep Sheets", icon: "receipt_long", permission: "manage_events" as const },
   { href: "/recipes", label: "Recipes", icon: "menu_book", permission: "view_recipes" as const },
   { href: "/ingredients", label: "Ingredients", icon: "egg_alt", permission: "view_recipes" as const },
+  { href: "/menu-planner", label: "Menu Planner", icon: "restaurant_menu", permission: "view_recipes" as const },
   { href: "/clients", label: "Clients", icon: "group", permission: "view_clients" as const },
   { href: "/vendors", label: "Vendors", icon: "local_shipping", permission: "manage_purchasing" as const },
   { href: "/purchasing", label: "Purchasing", icon: "shopping_cart", permission: "manage_purchasing" as const },
