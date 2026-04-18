@@ -103,7 +103,7 @@ export default function RecipesPage() {
             className="h-10 bg-white text-gray-700 text-sm font-bold rounded-xl border border-gray-200 px-4 flex items-center gap-2 hover:bg-gray-50 transition-all duration-150"
           >
             <span className="material-symbols-outlined text-lg">upload_file</span>
-            Import from Excel
+            Import Recipes
           </Link>
           <Link
             href="/recipes/new"
