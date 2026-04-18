@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -144,7 +143,6 @@ interface ParsedRecipe {
   name: string;
   servings: number;
   category: string;
-  description: string;
   lines: ParsedLine[];
 }
 
@@ -233,7 +231,6 @@ function parseWorkbook(
     name: extractRecipeName(title),
     servings: parseServingsFromTitle(title) ?? 10,
     category: "other",
-    description: "",
     lines,
   };
 }
@@ -340,7 +337,6 @@ export default function ImportRecipePage() {
         name: parsed.name.trim(),
         servings: parsed.servings,
         category: parsed.category,
-        description: parsed.description.trim() || undefined,
         totalRecipeCost: preview.totalCost,
         costPerServing: preview.costPerServing,
       } as any);
@@ -483,18 +479,6 @@ export default function ImportRecipePage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-1.5 md:col-span-2">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                  Description (optional)
-                </label>
-                <Textarea
-                  rows={2}
-                  value={parsed.description}
-                  onChange={(e) =>
-                    setParsed({ ...parsed, description: e.target.value })
-                  }
-                />
               </div>
             </div>
           </div>

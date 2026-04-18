@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -38,7 +37,6 @@ export default function NewRecipePage() {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [servings, setServings] = useState("");
-  const [description, setDescription] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -62,7 +60,6 @@ export default function NewRecipePage() {
         name: name.trim(),
         category,
         servings: Number(servings),
-        description: description.trim() || undefined,
         costPerServing: 0,
         totalRecipeCost: 0,
         createdAt: new Date(),
@@ -140,19 +137,6 @@ export default function NewRecipePage() {
                   </div>
                 </div>
 
-                {/* Description */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                    Description
-                  </label>
-                  <Textarea
-                    placeholder="Brief description, prep notes, or special instructions..."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    rows={3}
-                    className="bg-gray-50 border-none rounded-lg resize-none"
-                  />
-                </div>
               </div>
             </div>
           </div>

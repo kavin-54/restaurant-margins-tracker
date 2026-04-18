@@ -7,7 +7,6 @@ import { LoadingScreen } from "@/components/layout/LoadingScreen";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -98,7 +97,6 @@ export default function RecipeDetailPage() {
   const [editName, setEditName] = useState("");
   const [editCategory, setEditCategory] = useState("");
   const [editServings, setEditServings] = useState("");
-  const [editDescription, setEditDescription] = useState("");
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [addLineOpen, setAddLineOpen] = useState(false);
@@ -118,7 +116,6 @@ export default function RecipeDetailPage() {
       setEditName(recipe.name);
       setEditCategory(recipe.category);
       setEditServings(String(recipe.servings));
-      setEditDescription(recipe.description || "");
     }
   }, [recipe]);
 
@@ -160,7 +157,6 @@ export default function RecipeDetailPage() {
         name: editName.trim(),
         category: editCategory,
         servings: newServings,
-        description: editDescription.trim() || undefined,
         totalRecipeCost,
         costPerServing,
       });
@@ -356,14 +352,6 @@ export default function RecipeDetailPage() {
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea
-                value={editDescription}
-                onChange={(e) => setEditDescription(e.target.value)}
-                rows={3}
-              />
-            </div>
             <div className="flex gap-2">
               <button
                 onClick={handleSaveEdit}
@@ -396,9 +384,6 @@ export default function RecipeDetailPage() {
                 <span className={`rounded-full px-3 py-1 text-xs font-bold ${badgeColor}`}>
                   {recipe.category}
                 </span>
-                {recipe.description && (
-                  <p className="text-sm text-gray-500 line-clamp-1">{recipe.description}</p>
-                )}
               </div>
             </div>
 
@@ -692,15 +677,6 @@ export default function RecipeDetailPage() {
               </div>
             </div>
 
-            {/* Instructions placeholder */}
-            <div className="bg-white rounded-2xl ambient-shadow p-5">
-              <h3 className="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-4">Instructions</h3>
-              {recipe.description ? (
-                <p className="text-sm text-gray-600 leading-relaxed">{recipe.description}</p>
-              ) : (
-                <p className="text-sm text-gray-400 italic">No instructions added yet.</p>
-              )}
-            </div>
           </div>
         </div>
       )}
