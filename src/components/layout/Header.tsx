@@ -215,12 +215,6 @@ export function Header({ onMenuToggle }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-2">
-        <button className="w-10 h-10 rounded-full flex items-center justify-center text-gray-400 hover:bg-slate-100 transition-colors relative">
-          <span className="material-symbols-outlined text-xl">notifications</span>
-        </button>
-        <button className="w-10 h-10 rounded-full flex items-center justify-center text-gray-400 hover:bg-slate-100 transition-colors">
-          <span className="material-symbols-outlined text-xl">help_outline</span>
-        </button>
         <Link
           href="/events/new"
           className="hidden md:flex h-10 bg-gradient-to-r from-blue-700 to-blue-900 text-white text-sm font-bold rounded-full shadow-sm hover:shadow-md active:scale-95 transition-all duration-150 items-center gap-2 px-5"

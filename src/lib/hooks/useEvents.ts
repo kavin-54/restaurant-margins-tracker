@@ -24,6 +24,7 @@ export interface EventMenuItem {
 
 export interface Event {
   id: string;
+  eventName?: string;
   clientId: string;
   clientName: string;
   eventDate: Date;

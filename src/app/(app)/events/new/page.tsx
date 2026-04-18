@@ -61,14 +61,25 @@ export default function NewEventPage() {
       return;
     }
 
+    const guestCount = parseInt(form.guestCount, 10);
+    if (!Number.isFinite(guestCount) || guestCount <= 0) {
+      toast({
+        title: "Invalid guest count",
+        description: "Guest count must be a positive number.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       const newEvent = await addEvent({
+        eventName: form.eventName.trim(),
         clientId: form.clientId,
         clientName: selectedClient?.name || "",
         eventDate: new Date(form.eventDate + "T00:00:00"),
         eventType: form.eventType,
-        guestCount: parseInt(form.guestCount, 10),
+        guestCount,
         status: "inquiry",
         totalCost: 0,
         totalPrice: 0,
@@ -80,8 +91,7 @@ export default function NewEventPage() {
 
       toast({ title: "Event created", description: `${form.eventName} has been created.` });
       router.push(`/events/${newEvent.id}`);
-    } catch (err) {
-      console.error(err);
+    } catch {
       toast({
         title: "Error",
         description: "Failed to create event. Please try again.",

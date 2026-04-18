@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { LoadingScreen } from "@/components/layout/LoadingScreen";
 import { useIngredients, deleteIngredient } from "@/lib/hooks/useIngredients";
+import { useInventory, type InventoryItem } from "@/lib/hooks/useInventory";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -64,14 +65,13 @@ function getCategoryBadgeClasses(category: string): string {
   }
 }
 
-// Stock level indicator based on cost (simulated - in production would use inventory data)
-function getStockIndicator(costPerUnit: number): { color: string; label: string } {
-  // Simulated stock level - in production this would come from inventory data
-  // Using a deterministic hash of cost to simulate varied stock levels
-  const hash = Math.abs(Math.sin(costPerUnit * 1000)) * 100;
-  if (hash > 60) return { color: "bg-green-500", label: "In Stock" };
-  if (hash > 30) return { color: "bg-yellow-500", label: "Low" };
-  return { color: "bg-red-500", label: "Critical" };
+function getStockIndicator(inv: InventoryItem | undefined): { color: string; label: string } {
+  if (!inv) return { color: "bg-gray-300", label: "No data" };
+  const reorder = inv.reorderPoint ?? 0;
+  if (inv.currentQuantity <= 0) return { color: "bg-red-500", label: "Out of stock" };
+  if (reorder > 0 && inv.currentQuantity <= reorder) return { color: "bg-red-500", label: "Critical" };
+  if (reorder > 0 && inv.currentQuantity <= reorder * 1.5) return { color: "bg-yellow-500", label: "Low" };
+  return { color: "bg-green-500", label: "In stock" };
 }
 
 import { limit } from "firebase/firestore";
@@ -82,17 +82,23 @@ const ITEMS_PER_PAGE = 15;
 export default function IngredientsPage() {
   const constraints = useMemo(() => [limit(200)], []);
   const { data: ingredients, loading, error } = useIngredients(constraints);
+  const { data: inventory } = useInventory();
   const { toast } = useToast();
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("name-asc");
   const [currentPage, setCurrentPage] = useState(1);
   const [favoritesCollapsed, setFavoritesCollapsed] = useState(false);
 
-  // Simulated frequently used / favorites (top 10 by cost activity)
-  const favorites = useMemo(() => {
+  // Map ingredientId → InventoryItem for quick stock lookup
+  const inventoryByIngredient = useMemo(() => {
+    const map = new Map<string, InventoryItem>();
+    for (const inv of inventory ?? []) map.set(inv.ingredientId, inv);
+    return map;
+  }, [inventory]);
+
+  // "Most expensive" top 10 — labelled as such since we don't yet track recipe usage frequency
+  const topByCost = useMemo(() => {
     if (!ingredients || ingredients.length === 0) return [];
-    // Sort by costPerUnit descending as a proxy for "most used" (in production, this would
-    // be based on actual recipe usage counts or purchase frequency)
     return [...ingredients]
       .sort((a, b) => b.costPerUnit - a.costPerUnit)
       .slice(0, 10);
@@ -134,18 +140,6 @@ export default function IngredientsPage() {
     currentPage * ITEMS_PER_PAGE
   );
 
-  // Simulated price trend data (in production, compare latest vendor record price to previous)
-  function getPriceTrend(ing: { costPerUnit: number; name: string }): {
-    direction: "up" | "down" | "flat";
-    pct: number;
-  } {
-    // Simulated: use a deterministic hash to produce stable "trends"
-    const hash = Math.sin(ing.name.length * 7 + ing.costPerUnit * 13);
-    if (Math.abs(hash) < 0.2) return { direction: "flat", pct: 0 };
-    if (hash > 0) return { direction: "up", pct: Math.abs(hash * 15) };
-    return { direction: "down", pct: Math.abs(hash * 12) };
-  }
-
   async function handleDelete(e: React.MouseEvent, id: string, name: string) {
     e.preventDefault();
     e.stopPropagation();
@@ -185,8 +179,8 @@ export default function IngredientsPage() {
 
       {ingredients && ingredients.length > 0 ? (
         <>
-          {/* Favorites / Frequently Used Section */}
-          {favorites.length > 0 && (
+          {/* Most Expensive top 10 */}
+          {topByCost.length > 0 && (
             <div className="mb-6">
               <button
                 onClick={() => setFavoritesCollapsed(!favoritesCollapsed)}
@@ -196,17 +190,17 @@ export default function IngredientsPage() {
                   expand_more
                 </span>
                 <h3 className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">
-                  Frequently Used
+                  Most Expensive
                 </h3>
                 <span className="text-[10px] text-gray-300 font-medium">
-                  ({favorites.length})
+                  ({topByCost.length})
                 </span>
               </button>
 
               {!favoritesCollapsed && (
                 <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
-                  {favorites.map((ing) => {
-                    const stock = getStockIndicator(ing.costPerUnit);
+                  {topByCost.map((ing) => {
+                    const stock = getStockIndicator(inventoryByIngredient.get(ing.id));
                     return (
                       <Link
                         key={ing.id}
@@ -288,7 +282,7 @@ export default function IngredientsPage() {
                         Cost/Unit
                       </th>
                       <th className="text-left px-6 py-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest">
-                        Price Trend
+                        Stock
                       </th>
                       <th className="text-left px-6 py-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest">
                         Supplier
@@ -300,7 +294,7 @@ export default function IngredientsPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {paginatedItems.map((ing) => {
-                      const trend = getPriceTrend(ing);
+                      const stock = getStockIndicator(inventoryByIngredient.get(ing.id));
                       return (
                         <tr
                           key={ing.id}
@@ -331,22 +325,10 @@ export default function IngredientsPage() {
                             {formatCurrency(ing.costPerUnit)}
                           </td>
                           <td className="px-6 py-4">
-                            {trend.direction === "up" ? (
-                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600">
-                                <span className="material-symbols-outlined text-sm">arrow_upward</span>
-                                {trend.pct.toFixed(1)}%
-                              </span>
-                            ) : trend.direction === "down" ? (
-                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-600">
-                                <span className="material-symbols-outlined text-sm">arrow_downward</span>
-                                {trend.pct.toFixed(1)}%
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400">
-                                <span className="material-symbols-outlined text-sm">remove</span>
-                                &mdash;
-                              </span>
-                            )}
+                            <span className="inline-flex items-center gap-2 text-xs font-semibold text-gray-600">
+                              <span className={`w-2 h-2 rounded-full ${stock.color}`} />
+                              {stock.label}
+                            </span>
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500">
                             {ing.supplier || "\u2014"}
