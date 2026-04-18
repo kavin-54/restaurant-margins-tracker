@@ -50,10 +50,8 @@ function convertCostPerUnit(
   return baseCostPerUnit * (target.toBase / base.toBase);
 }
 
-function unitsForIngredient(ingredientUnit: string) {
-  const base = getUnit(ingredientUnit);
-  if (!base) return UNITS;
-  return UNITS.filter((u) => u.type === base.type);
+function unitsForIngredient(_ingredientUnit: string) {
+  return UNITS;
 }
 
 const CATEGORIES = [
