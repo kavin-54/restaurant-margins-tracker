@@ -174,7 +174,7 @@ The hooks in `src/lib/hooks/` define their OWN simpler interfaces (e.g., `Event`
 
 ### Key Hook Interface Fields
 - **Event:** `clientId, clientName, eventDate, eventType, guestCount, status (inquiry|proposal|confirmed|completed|cancelled), totalCost, totalPrice, marginPercentage`
-- **Recipe:** `name, servings, costPerServing, totalRecipeCost, category, description` + `lines` subcollection
+- **Recipe:** `name, servings, costPerServing, totalRecipeCost, category` + `lines` subcollection. (`description?` still exists on the TypeScript type for back-compat with legacy docs but is no longer set or displayed by any UI — the field was removed from `/recipes/new`, `/recipes/[id]` edit, and `/recipes/import` forms.)
 - **Ingredient:** `name, unit, costPerUnit, supplier, category`
 - **Client:** `name, email, phone, company, address, city, state, notes`
 - **Vendor:** `name, email, phone, address, city, state, contactPerson, specialties[], leadTime, minimumOrder, notes`
@@ -247,3 +247,4 @@ Material Design 3 / Google Stitch tokens applied globally:
 - `npm run build` sometimes emits stale trace/MODULE_NOT_FOUND errors from `.next/` after large file changes; `rm -rf .next && npm run build` clears it. Vercel builds are always fresh so this is a local-only annoyance.
 - Recipe lines store a snapshot of the ingredient's price at creation time. Re-seeding or editing an ingredient's `costPerUnit` does NOT update existing recipe/event costs until you delete & re-add the line.
 - The Excel importer expects ONE recipe per file (first sheet). Multi-sheet workbooks will silently ignore sheets 2+.
+- **Cross-type unit lines (legacy data hazard):** `convertCostPerUnit()` returns the base cost unchanged when line and ingredient are in different measurement families (e.g., line `unit: "g"` against a liter-priced ingredient). The line-unit dropdown now filters by measurement type so this can't be created from the UI, but lines written before commit `9e8c68d` may still carry a mismatched unit and silently produce line costs off by ~1000x. To audit: scan every `recipes/*/lines/*` doc and flag any where `getUnitType(line.unit) !== getUnitType(ingredient.unit)`; fix by changing the line unit to one of the ingredient's type (e.g., `g` → `ml` for dairy at density ≈ 1 g/ml) and recomputing `costPerUnit` + `lineCost` + the parent recipe's `totalRecipeCost`/`costPerServing`.
