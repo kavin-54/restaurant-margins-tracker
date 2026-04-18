@@ -96,12 +96,24 @@ export default function RecipesPage() {
       <PageHeader
         title="Recipe Catalog"
         description="Discover and manage your culinary creations"
-        action={{
-          label: "New Recipe",
-          href: "/recipes/new",
-          icon: "add",
-        }}
-      />
+      >
+        <div className="mt-4 flex gap-2">
+          <Link
+            href="/recipes/import"
+            className="h-10 bg-white text-gray-700 text-sm font-bold rounded-xl border border-gray-200 px-4 flex items-center gap-2 hover:bg-gray-50 transition-all duration-150"
+          >
+            <span className="material-symbols-outlined text-lg">upload_file</span>
+            Import from Excel
+          </Link>
+          <Link
+            href="/recipes/new"
+            className="h-10 bg-gradient-to-r from-blue-700 to-blue-900 text-white text-sm font-bold rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-150 flex items-center gap-2 px-4"
+          >
+            <span className="material-symbols-outlined text-lg">add</span>
+            New Recipe
+          </Link>
+        </div>
+      </PageHeader>
 
       {recipes && recipes.length > 0 ? (
         <>
