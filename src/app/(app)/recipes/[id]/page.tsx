@@ -35,7 +35,7 @@ import {
   type RecipeLine,
 } from "@/lib/hooks/useRecipes";
 import { useIngredients } from "@/lib/hooks/useIngredients";
-import { UNITS, getUnit } from "@/lib/constants/units";
+import { UNITS, getUnit, getUnitType } from "@/lib/constants/units";
 
 function convertCostPerUnit(
   baseUnit: string,
@@ -49,8 +49,10 @@ function convertCostPerUnit(
   return baseCostPerUnit * (target.toBase / base.toBase);
 }
 
-function unitsForIngredient(_ingredientUnit: string) {
-  return UNITS;
+function unitsForIngredient(ingredientUnit: string) {
+  const type = getUnitType(ingredientUnit);
+  if (!type) return UNITS;
+  return UNITS.filter((u) => u.type === type);
 }
 
 const CATEGORIES = [
