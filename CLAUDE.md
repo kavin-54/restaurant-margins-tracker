@@ -42,6 +42,7 @@ Internal catering operations platform for a Coimbatore, India-based catering com
 │   │       │   ├── import/     # Excel (.xlsx) upload → parse → preview → create recipe
 │   │       │   └── [id]/       # Detail + editable ingredient lines with per-line unit selector
 │   │       ├── ingredients/    # Ingredient CRUD + favorites + price trends
+│   │       ├── menu-planner/   # Budget-constrained menu generator (veg/non-veg + category counts)
 │   │       ├── clients/        # Client CRUD + revenue analytics + segments
 │   │       ├── vendors/        # Vendor CRUD + order history + price comparison
 │   │       ├── purchasing/     # Purchase orders + smart PO aggregation
@@ -72,12 +73,16 @@ Internal catering operations platform for a Coimbatore, India-based catering com
 │       │   └── useSystemConfig.ts
 │       ├── types/              # TypeScript types (NOTE: hooks define their own simpler interfaces)
 │       ├── constants/          # Allergens, categories, units, defaults
+│       ├── menuPlanner.ts      # Pure generator: veg inference + branch-and-bound menu enumeration
 │       └── utils.ts            # formatCurrency (INR), formatPercent, cn()
 ├── scripts/
-│   ├── seed-coimbatore-data.mjs  # Legacy: fictional South Indian demo data
-│   ├── clear-data.mjs            # Wipe all demo collections (preserves users, systemConfig)
-│   ├── seed-hfs-ingredients.mjs  # Seed 199 real HFS ingredients from consumption report
-│   └── fix-pack-units.mjs        # Convert PKT/BOT ingredients to real weight/volume units
+│   ├── seed-coimbatore-data.mjs   # Legacy: fictional South Indian demo data
+│   ├── clear-data.mjs             # Wipe all demo collections (preserves users, systemConfig)
+│   ├── seed-hfs-ingredients.mjs   # Seed 199 real HFS ingredients from consumption report
+│   ├── fix-pack-units.mjs         # Convert PKT/BOT ingredients to real weight/volume units
+│   ├── audit-unit-mismatches.mjs  # Read-only: flag recipe lines whose unit is unknown or cross-type
+│   ├── fix-curd-line.mjs          # One-off: normalize a known cross-type curd line (historical)
+│   └── fix-grm-unit-lines.mjs     # One-off: rename recipe-line unit "grm" → "g" (historical)
 ├── firestore.rules             # Firestore security rules (authenticated users)
 ├── firebase.json               # Firebase project config
 ├── .firebaserc                 # Firebase project alias
@@ -98,7 +103,7 @@ Internal catering operations platform for a Coimbatore, India-based catering com
 - **Persona:** Rajesh Kumar, owner of HFS Catering in Coimbatore, Tamil Nadu
 
 ## Current Firestore Data
-**As of the latest re-seed, the database contains only ingredients** — vendors, clients, recipes, events, purchase orders, waste, and inventory were all cleared to give both logins a blank operational slate. Ingredients come from the real HFS 01/04/2026–18/04/2026 Costcenter Consumption Report (199 items across protein, produce, dairy, spice, oil-fat, grain-starch, dry-goods, condiment, beverage, other). Packet/bottle items (e.g., `Asafoetida Powder 100g`, `Refined Oil 1L`) are normalized to `kg`/`liter` with per-unit pricing so recipes can use any universal unit.
+**As of the latest re-seed, the database contains only ingredients** — vendors, clients, recipes, events, purchase orders, waste, and inventory were all cleared to give both logins a blank operational slate. Ingredients come from the real HFS 01/04/2026–18/04/2026 Costcenter Consumption Report (199 items across protein, produce, vegetable, dairy, spice, oil-fat, grain-starch, dry-goods, condiment, beverage, other). Packet/bottle items (e.g., `Asafoetida Powder 100g`, `Refined Oil 1L`) are normalized to `kg`/`liter` with per-unit pricing so recipes can use any universal unit. The `vegetable` category sits alongside `produce` (distinct badge color) and is surfaced in every ingredient category picker.
 
 See `scripts/seed-hfs-ingredients.mjs` for the source-of-truth list and `scripts/fix-pack-units.mjs` for the normalization rules.
 
@@ -194,9 +199,19 @@ Employees upload an `.xlsx` file and the page parses it client-side with `xlsx` 
 ### Per-line Universal Unit Selector (`/recipes/[id]`)
 The Add/Edit Ingredient Line flow on the recipe detail page exposes a Unit dropdown next to Quantity.
 
-- **Filtering:** `unitsForIngredient()` currently filters the dropdown to units of the same measurement type as the ingredient's stored unit (weight ↔ weight, volume ↔ volume, count ↔ count). This means a `kg`-stored ingredient only offers weight units (oz, lb, g, kg) — not volume or count. If you want cross-type picks, remove the filter in that helper.
-- **Conversion:** `convertCostPerUnit(baseUnit, baseCost, targetUnit)` multiplies by `target.toBase / base.toBase`. Cross-type (different measurement families) returns the base cost unchanged — no safe conversion exists.
+- **Filtering:** `unitsForIngredient()` filters the dropdown to units of the same measurement type as the ingredient's stored unit (weight ↔ weight, volume ↔ volume, count ↔ count). A `kg`-stored ingredient only offers weight units (oz, lb, g, kg) — not volume or count. If you want cross-type picks, remove the filter in that helper.
+- **Conversion:** `convertCostPerUnit(baseUnit, baseCost, targetUnit)` multiplies by `target.toBase / base.toBase` and returns `number | null`. It returns `null` when either unit is unrecognized (typos like `grm`) or when they belong to different measurement families — callers MUST treat `null` as an error rather than silently falling back, which is what used to cause 1000× line-cost bugs. `handleAddLine`/`handleUpdateLine` reject the write with a toast; the inline editor reddens the Unit Select and shows "Unit mismatch" in place of the Line Cost; the importer blocks `handleImportAll` on any mismatched line.
+- **Read-only row warnings:** each rendered ingredient line cross-checks `line.unit` against the ingredient's stored unit via `isLineUnitConsistent`. When inconsistent, the ingredient name gets a red `warning` icon and the Unit + Line Cost columns render in red — this surfaces legacy bad data instead of letting it look fine.
 - **Storage:** recipe lines save a snapshot of `unit`, `costPerUnit` (converted), `quantity`, and `lineCost`. Editing the ingredient's base price later does NOT retroactively update existing lines.
+- **Sticky Actions column:** the rightmost Actions cell in the ingredient-lines table is `position: sticky; right: 0` with a subtle left shadow. The edit-mode row widens enough to push buttons off-screen on narrow viewports, so the save/cancel/edit/delete controls pin to the right edge and stay visible regardless of horizontal scroll.
+
+### Menu Planner (`/menu-planner`, `src/lib/menuPlanner.ts`)
+Budget-constrained menu generator. The page lets users pick Vegetarian vs Non-Vegetarian (required, top of form), set a Max ₹/person, optionally enter a guest count, and adjust per-category dish counts (Appetizer · Soup · Main · Side · Bread · Sauce · Dessert · Beverage). Generated results surface as three archetype cards — Budget Pick / Best Value / Premium — with an expandable "Show all N" list.
+
+- **Dietary inference (no per-recipe flag):** a recipe is classified non-veg iff any line references an ingredient with `category === "protein"`. This works reliably with the current HFS ingredient catalog where proteins (chicken, mutton, fish, eggs, etc.) are all tagged `protein` and dairy is its own category. Adding a separate `dietaryType` field was rejected in favor of inference to avoid a data-migration step and the risk of un-tagged recipes.
+- **Algorithm:** `generateMenus()` in `src/lib/menuPlanner.ts` is a pure function that buckets matching recipes by category, then enumerates combinations via branch-and-bound using a cheapest-remainder lower bound to prune any branch whose projected total exceeds the budget. Result cap defaults to 2000 internally; the UI picks three archetypes plus an optional full list capped at 50.
+- **Availability counts:** each category stepper shows live `N available` after applying the veg filter, and the + button disables when the count would exceed availability — users can't request 3 desserts when only 2 exist.
+- **No Firestore writes:** the planner is read-only. Saving a chosen menu as an event is intentionally deferred — the path there is to add a "Use this menu" button that routes to `/events/new` with the menu pre-encoded, so all mutation stays in the existing event-creation flow.
 
 ### Global Search (`src/components/layout/Header.tsx`)
 The header search input filters across `events`, `recipes`, `clients`, `ingredients`, and `vendors` on every keystroke (client-side — the collections are already in memory from the relevant hooks). Results are grouped and each entry links to the item's detail page. Escape or outside-click dismisses the dropdown.
@@ -228,6 +243,7 @@ Material Design 3 / Google Stitch tokens applied globally:
 - `node scripts/clear-data.mjs` — wipe demo collections (keeps users + systemConfig)
 - `node scripts/seed-hfs-ingredients.mjs` — load real HFS ingredients
 - `node scripts/fix-pack-units.mjs` — normalize PKT/BOT items to kg/liter
+- `node scripts/audit-unit-mismatches.mjs` — read-only: list recipe lines with unknown or cross-type units
 - `node scripts/seed-coimbatore-data.mjs` — legacy fictional demo (clears + re-seeds everything)
 - `firebase deploy --only firestore:rules` — deploy Firestore security rules
 
@@ -247,4 +263,4 @@ Material Design 3 / Google Stitch tokens applied globally:
 - `npm run build` sometimes emits stale trace/MODULE_NOT_FOUND errors from `.next/` after large file changes; `rm -rf .next && npm run build` clears it. Vercel builds are always fresh so this is a local-only annoyance.
 - Recipe lines store a snapshot of the ingredient's price at creation time. Re-seeding or editing an ingredient's `costPerUnit` does NOT update existing recipe/event costs until you delete & re-add the line.
 - The Excel importer expects ONE recipe per file (first sheet). Multi-sheet workbooks will silently ignore sheets 2+.
-- **Cross-type unit lines (legacy data hazard):** `convertCostPerUnit()` returns the base cost unchanged when line and ingredient are in different measurement families (e.g., line `unit: "g"` against a liter-priced ingredient). The line-unit dropdown now filters by measurement type so this can't be created from the UI, but lines written before commit `9e8c68d` may still carry a mismatched unit and silently produce line costs off by ~1000x. To audit: scan every `recipes/*/lines/*` doc and flag any where `getUnitType(line.unit) !== getUnitType(ingredient.unit)`; fix by changing the line unit to one of the ingredient's type (e.g., `g` → `ml` for dairy at density ≈ 1 g/ml) and recomputing `costPerUnit` + `lineCost` + the parent recipe's `totalRecipeCost`/`costPerServing`.
+- **Cross-type / unknown-unit lines (legacy data hazard):** earlier, `convertCostPerUnit()` silently returned the base cost unchanged when the line's unit was unrecognized (typos like `grm`) or in a different measurement family than the ingredient's stored unit — producing line costs off by ~1000x. Since commit `507b481` the function returns `null` in those cases, all writers (add/edit/import) refuse to save such lines, and the recipe-detail table shows a red warning icon + red Unit/Line-Cost columns for legacy rows that were already written. Use `node scripts/audit-unit-mismatches.mjs` to list anything still broken. Weight-only fixes (e.g., `grm` → `g`) can be auto-migrated; cross-type cases (`each` vs `kg` for bananas/chillies, `g` vs `liter` for curd) need human judgment — usually either repricing the ingredient per-piece or rewriting the line in the ingredient's unit family.
