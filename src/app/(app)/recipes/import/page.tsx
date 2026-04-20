@@ -35,7 +35,7 @@ const CATEGORIES = [
 ];
 
 const UNIT_ALIASES: Record<string, string> = {
-  g: "g", gm: "g", gms: "g", gram: "g", grams: "g",
+  g: "g", gm: "g", gms: "g", gr: "g", grm: "g", grms: "g", gram: "g", grams: "g",
   kg: "kg", kgs: "kg", kilogram: "kg", kilograms: "kg",
   oz: "oz", ounce: "oz", ounces: "oz",
   lb: "lb", lbs: "lb", pound: "lb", pounds: "lb",
@@ -88,11 +88,11 @@ function convertCostPerUnit(
   baseUnit: string,
   baseCostPerUnit: number,
   targetUnit: string,
-): number {
+): number | null {
   if (baseUnit === targetUnit) return baseCostPerUnit;
   const base = getUnit(baseUnit);
   const target = getUnit(targetUnit);
-  if (!base || !target || base.type !== target.type) return baseCostPerUnit;
+  if (!base || !target || base.type !== target.type) return null;
   return baseCostPerUnit * (target.toBase / base.toBase);
 }
 
@@ -336,10 +336,28 @@ export default function ImportRecipePage() {
         // Build line details once per recipe
         const lineDetails = parsed.lines.map((line) => {
           const ing = ingredients?.find((i) => i.id === line.matchedIngredientId);
-          if (!ing) return { costPerUnit: 0, lineCost: 0, ing: null as Ingredient | null };
-          const costPerUnit = convertCostPerUnit(ing.unit, ing.costPerUnit, line.unit);
-          return { costPerUnit, lineCost: line.quantity * costPerUnit, ing };
+          if (!ing) return { costPerUnit: 0, lineCost: 0, ing: null as Ingredient | null, unitOk: false };
+          const converted = convertCostPerUnit(ing.unit, ing.costPerUnit, line.unit);
+          if (converted === null) {
+            return { costPerUnit: 0, lineCost: 0, ing, unitOk: false };
+          }
+          return { costPerUnit: converted, lineCost: line.quantity * converted, ing, unitOk: true };
         });
+
+        const incompatibleLines = lineDetails
+          .map((d, i) => ({ d, line: parsed.lines[i] }))
+          .filter((x) => x.d.ing && !x.d.unitOk);
+        if (incompatibleLines.length > 0) {
+          const names = incompatibleLines
+            .map((x) => `${x.line.rawIngredient} (${x.line.unit} vs ${x.d.ing!.unit})`)
+            .join(", ");
+          updateItem(it.id, {
+            status: "failed",
+            importError: `Unit mismatch on: ${names}. Fix the unit column in the Excel or change each line's unit before importing.`,
+          });
+          continue;
+        }
+
         const totalCost = lineDetails.reduce((sum, d) => sum + d.lineCost, 0);
         const costPerServing = parsed.servings > 0 ? totalCost / parsed.servings : 0;
 
@@ -547,24 +565,29 @@ function RecipeCard({
     if (!item.parsed) return null;
     let totalCost = 0;
     let unmatchedCount = 0;
+    let unitMismatchCount = 0;
     const lineDetails = item.parsed.lines.map((line) => {
       const ing = ingredients.find((i) => i.id === line.matchedIngredientId);
       if (!ing) {
         unmatchedCount++;
-        return { costPerUnit: 0, lineCost: 0, ing: null as Ingredient | null };
+        return { costPerUnit: 0, lineCost: 0, ing: null as Ingredient | null, unitOk: false };
       }
-      const costPerUnit = convertCostPerUnit(
+      const converted = convertCostPerUnit(
         ing.unit,
         ing.costPerUnit,
         line.unit,
       );
-      const lineCost = line.quantity * costPerUnit;
+      if (converted === null) {
+        unitMismatchCount++;
+        return { costPerUnit: 0, lineCost: 0, ing, unitOk: false };
+      }
+      const lineCost = line.quantity * converted;
       totalCost += lineCost;
-      return { costPerUnit, lineCost, ing };
+      return { costPerUnit: converted, lineCost, ing, unitOk: true };
     });
     const costPerServing =
       item.parsed.servings > 0 ? totalCost / item.parsed.servings : 0;
-    return { lineDetails, totalCost, costPerServing, unmatchedCount };
+    return { lineDetails, totalCost, costPerServing, unmatchedCount, unitMismatchCount };
   }, [item.parsed, ingredients]);
 
   const statusBorder =
@@ -634,6 +657,12 @@ function RecipeCard({
                 <span className="text-amber-600 font-semibold">
                   {" "}
                   · {preview.unmatchedCount} unmatched
+                </span>
+              )}
+              {preview && preview.unitMismatchCount > 0 && (
+                <span className="text-red-600 font-semibold">
+                  {" "}
+                  · {preview.unitMismatchCount} unit mismatch
                 </span>
               )}
             </p>
@@ -741,6 +770,14 @@ function RecipeCard({
               <p className="text-xs text-amber-600 font-medium mb-2">
                 {preview.unmatchedCount} line(s) couldn&apos;t be matched. Pick an
                 ingredient from the dropdown, select &quot;Skip&quot;, or delete the row.
+              </p>
+            )}
+            {preview && preview.unitMismatchCount > 0 && (
+              <p className="text-xs text-red-600 font-medium mb-2">
+                {preview.unitMismatchCount} line(s) use a unit that can&apos;t
+                convert to the matched ingredient&apos;s stored unit. Fix the unit
+                in the Excel or the ingredient record — importing is blocked
+                until these are resolved.
               </p>
             )}
             <div className="overflow-x-auto">

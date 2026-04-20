@@ -41,12 +41,21 @@ function convertCostPerUnit(
   baseUnit: string,
   baseCostPerUnit: number,
   targetUnit: string,
-): number {
+): number | null {
   if (baseUnit === targetUnit) return baseCostPerUnit;
   const base = getUnit(baseUnit);
   const target = getUnit(targetUnit);
-  if (!base || !target || base.type !== target.type) return baseCostPerUnit;
+  if (!base || !target || base.type !== target.type) return null;
   return baseCostPerUnit * (target.toBase / base.toBase);
+}
+
+function isLineUnitConsistent(lineUnit: string, ingredientUnit?: string): boolean {
+  if (!ingredientUnit) return true;
+  if (lineUnit === ingredientUnit) return true;
+  const lt = getUnitType(lineUnit);
+  const it = getUnitType(ingredientUnit);
+  if (!lt) return false;
+  return !it || lt === it;
 }
 
 function unitsForIngredient(ingredientUnit: string) {
@@ -209,6 +218,14 @@ export default function RecipeDetailPage() {
       ingredient.costPerUnit,
       chosenUnit,
     );
+    if (convertedCostPerUnit === null) {
+      toast({
+        title: "Unit mismatch",
+        description: `${chosenUnit} can't be converted to ${ingredient.unit}. Pick a compatible unit.`,
+        variant: "destructive",
+      });
+      return;
+    }
     const lineCost = qty * convertedCostPerUnit;
     const maxSort = (lines || []).reduce(
       (max, l) => Math.max(max, l.sortOrder),
@@ -253,6 +270,14 @@ export default function RecipeDetailPage() {
     const convertedCostPerUnit = ingredient
       ? convertCostPerUnit(ingredient.unit, ingredient.costPerUnit, chosenUnit)
       : line.costPerUnit;
+    if (convertedCostPerUnit === null) {
+      toast({
+        title: "Unit mismatch",
+        description: `${chosenUnit} can't be converted to ${ingredient?.unit}. Pick a compatible unit.`,
+        variant: "destructive",
+      });
+      return;
+    }
     const lineCost = qty * convertedCostPerUnit;
     try {
       await updateRecipeLine(recipeId, line.id, {
@@ -582,9 +607,11 @@ export default function RecipeDetailPage() {
                             {editingLineId === line.id ? (
                               (() => {
                                 const editIng = ingredients?.find((i) => i.id === line.ingredientId);
-                                const editCostPerUnit = editIng
+                                const editConverted = editIng
                                   ? convertCostPerUnit(editIng.unit, editIng.costPerUnit, editLineUnit || line.unit)
                                   : line.costPerUnit;
+                                const editCostPerUnit = editConverted ?? 0;
+                                const editUnitOk = editConverted !== null;
                                 const editUnitOptions = editIng ? unitsForIngredient(editIng.unit) : UNITS;
                                 return (
                               <>
@@ -601,7 +628,7 @@ export default function RecipeDetailPage() {
                                 </td>
                                 <td className="py-3">
                                   <Select value={editLineUnit} onValueChange={setEditLineUnit}>
-                                    <SelectTrigger className="h-8 w-[90px]">
+                                    <SelectTrigger className={`h-8 w-[90px] ${editUnitOk ? "" : "border-red-500 ring-1 ring-red-500"}`}>
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -613,9 +640,13 @@ export default function RecipeDetailPage() {
                                     </SelectContent>
                                   </Select>
                                 </td>
-                                <td className="py-3 text-sm text-gray-500">{formatCurrency(editCostPerUnit)}</td>
+                                <td className="py-3 text-sm text-gray-500">
+                                  {editUnitOk ? formatCurrency(editCostPerUnit) : <span className="text-red-600 font-semibold">—</span>}
+                                </td>
                                 <td className="py-3 text-sm font-bold text-blue-700">
-                                  {formatCurrency(Number(editLineQuantity) * editCostPerUnit)}
+                                  {editUnitOk
+                                    ? formatCurrency(Number(editLineQuantity) * editCostPerUnit)
+                                    : <span className="text-red-600">Unit mismatch</span>}
                                 </td>
                                 <td className="py-3">
                                   <Input
@@ -645,12 +676,28 @@ export default function RecipeDetailPage() {
                                 );
                               })()
                             ) : (
+                              (() => {
+                                const readIng = ingredients?.find((i) => i.id === line.ingredientId);
+                                const unitOk = isLineUnitConsistent(line.unit, readIng?.unit);
+                                return (
                               <>
-                                <td className="py-3 text-sm font-medium text-gray-900">{line.ingredientName}</td>
+                                <td className="py-3 text-sm font-medium text-gray-900">
+                                  <span className="flex items-center gap-1.5">
+                                    {!unitOk && (
+                                      <span
+                                        title={`Unit "${line.unit}" is not compatible with ingredient stored in "${readIng?.unit}". Line cost is unreliable.`}
+                                        className="material-symbols-outlined text-red-500 text-base"
+                                      >
+                                        warning
+                                      </span>
+                                    )}
+                                    {line.ingredientName}
+                                  </span>
+                                </td>
                                 <td className="py-3 text-sm text-gray-700">{line.quantity}</td>
-                                <td className="py-3 text-sm text-gray-500">{line.unit}</td>
+                                <td className={`py-3 text-sm ${unitOk ? "text-gray-500" : "text-red-600 font-semibold"}`}>{line.unit}</td>
                                 <td className="py-3 text-sm text-gray-500">{formatCurrency(line.costPerUnit)}</td>
-                                <td className="py-3 text-sm font-bold text-blue-700">{formatCurrency(line.lineCost)}</td>
+                                <td className={`py-3 text-sm font-bold ${unitOk ? "text-blue-700" : "text-red-600"}`}>{formatCurrency(line.lineCost)}</td>
                                 <td className="py-3 text-sm text-gray-400">{line.notes || "-"}</td>
                                 <td className="sticky right-0 bg-white py-3 pl-3 text-right shadow-[-6px_0_6px_-6px_rgba(0,0,0,0.08)]">
                                   <div className="flex justify-end gap-1">
@@ -669,6 +716,8 @@ export default function RecipeDetailPage() {
                                   </div>
                                 </td>
                               </>
+                                );
+                              })()
                             )}
                           </tr>
                         ))}
