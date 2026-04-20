@@ -36,6 +36,7 @@ import { formatCurrency } from "@/lib/utils";
 const CATEGORIES = [
   { value: "protein", label: "Meat / Protein" },
   { value: "produce", label: "Produce" },
+  { value: "vegetable", label: "Vegetable" },
   { value: "dairy", label: "Dairy" },
   { value: "dry-goods", label: "Dry Goods" },
   { value: "spice", label: "Spice" },
@@ -75,6 +76,8 @@ function getCategoryBadgeClasses(category: string): string {
   switch (category) {
     case "produce":
       return "bg-green-100 text-green-700";
+    case "vegetable":
+      return "bg-emerald-100 text-emerald-700";
     case "dairy":
       return "bg-blue-100 text-blue-700";
     case "dry-goods":

@@ -42,7 +42,7 @@ export interface CustomConversion {
 }
 
 export type IngredientCategory =
-  | "protein" | "produce" | "dairy" | "dry-goods" | "spice" | "condiment"
+  | "protein" | "produce" | "vegetable" | "dairy" | "dry-goods" | "spice" | "condiment"
   | "oil-fat" | "grain-starch" | "beverage" | "disposable" | "packaging" | "other";
 
 export type ShelfLife = "same-day" | "2-3-days" | "1-week" | "2-weeks" | "shelf-stable";

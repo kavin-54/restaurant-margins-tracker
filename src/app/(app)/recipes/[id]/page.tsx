@@ -573,7 +573,7 @@ export default function RecipeDetailPage() {
                           <th className="text-left pb-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest w-[100px]">Cost/Unit</th>
                           <th className="text-left pb-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest w-[100px]">Line Cost</th>
                           <th className="text-left pb-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest">Notes</th>
-                          <th className="text-right pb-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest w-[100px]">Actions</th>
+                          <th className="sticky right-0 bg-white text-right pb-3 pl-3 text-[10px] uppercase font-bold text-gray-400 tracking-widest w-[100px] shadow-[-6px_0_6px_-6px_rgba(0,0,0,0.08)]">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -625,7 +625,7 @@ export default function RecipeDetailPage() {
                                     placeholder="Notes"
                                   />
                                 </td>
-                                <td className="py-3 text-right">
+                                <td className="sticky right-0 bg-white py-3 pl-3 text-right shadow-[-6px_0_6px_-6px_rgba(0,0,0,0.08)]">
                                   <div className="flex justify-end gap-1">
                                     <button
                                       onClick={() => handleUpdateLine(line)}
@@ -652,7 +652,7 @@ export default function RecipeDetailPage() {
                                 <td className="py-3 text-sm text-gray-500">{formatCurrency(line.costPerUnit)}</td>
                                 <td className="py-3 text-sm font-bold text-blue-700">{formatCurrency(line.lineCost)}</td>
                                 <td className="py-3 text-sm text-gray-400">{line.notes || "-"}</td>
-                                <td className="py-3 text-right">
+                                <td className="sticky right-0 bg-white py-3 pl-3 text-right shadow-[-6px_0_6px_-6px_rgba(0,0,0,0.08)]">
                                   <div className="flex justify-end gap-1">
                                     <button
                                       onClick={() => startEditLine(line)}

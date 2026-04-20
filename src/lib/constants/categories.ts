@@ -3,6 +3,7 @@ import { IngredientCategory, RecipeCategory, FoodCategory } from "@/lib/types";
 export const INGREDIENT_CATEGORIES: { value: IngredientCategory; label: string }[] = [
   { value: "protein", label: "Protein" },
   { value: "produce", label: "Produce" },
+  { value: "vegetable", label: "Vegetable" },
   { value: "dairy", label: "Dairy" },
   { value: "dry-goods", label: "Dry Goods" },
   { value: "spice", label: "Spice" },
