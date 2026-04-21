@@ -60,7 +60,7 @@ const UNIT_ALIASES: Record<string, string> = {
   nos: "each", no: "each", pcs: "each", pc: "each",
   each: "each", ea: "each", pkt: "each", pkts: "each", packet: "each",
   bot: "each", btl: "each", bottle: "each",
-  dozen: "dozen", case: "case", bunch: "bunch",
+  dozen: "dozen", case: "case", bunch: "bunch", bun: "bunch", bundle: "bunch",
 };
 
 function normalizeUnit(raw: string): string {
@@ -110,8 +110,14 @@ function guessCategory(xlsCat: string, rawName: string): string {
   if (
     /sugar|jaggary|jaggery|tamarind|syrup|sauce|pickle|kitchup|ketchup|\bjam\b|vinegar|tomato puree|mayonnaise|coconut milk powder|desicatted coconut|nannari/.test(n)
   ) return "condiment";
-  if (/egg|prawn|chicken|mutton|fish|beef|pork/.test(n)) return "protein";
+  if (/egg|prawn|chicken|mutton|fish|beef|pork|lamb|crab|squid/.test(n)) return "protein";
   if (/cheese|butter|curd|paneer|yog|milk/.test(n)) return "dairy";
+  if (
+    /\bapple\b|banana|orange|papaya|pappaya|pomegranate|pomagranet|musk melon|pineapple|water melon|watermelon|grapes|\bmango\b|guava|lemon|lime|dragon fruit|kiwi|strawberry|blueberry|fig|pear|peach|plum/.test(n)
+  ) return "produce";
+  if (
+    /cucumber|chow chow|ladies finger|okra|cabbage|onion|shallot|tomato|potato|carrot|beetroot|brinjal|eggplant|drumstick|spinach|capsicum|bell pepper|beans|green peas|cauliflower|broccoli|pumpkin|garlic|ginger|curry leaves|mint|coriander leaves|radish|turnip|yam|tapioca|gourd|snake gourd|bitter gourd|ridge gourd|bottle gourd|avarakkai|kothavarangai|keerai|amaranth|fenugreek leaves|spring onion|leek|lettuce/.test(n)
+  ) return "vegetable";
 
   return "other";
 }
@@ -164,6 +170,37 @@ function looksLikeStoreList(rows: unknown[][]): boolean {
   return tried >= 2 && hits / tried > 0.5;
 }
 
+const UNIT_TOKEN = /^(kg|kgs|g|gm|gms|gr|grm|lb|lbs|oz|lit|liter|liters|litre|litres|l|ml|gallon|gal|nos|no|pcs|pc|each|ea|pkt|pkts|packet|bot|btl|bottle|dozen|doz|case|bun|bunch|bundle)$/i;
+
+/**
+ * Detect the HFS Consumption Report layout: no header, no transaction IDs.
+ * Columns: [Name, Type, Unit, Qty, CostPerUnit, ListPrice, TotalValue, ...].
+ */
+function looksLikeConsumptionReport(rows: unknown[][]): boolean {
+  let hits = 0;
+  let tried = 0;
+  for (const r of rows.slice(0, 30)) {
+    const name = String(r?.[0] ?? "").trim();
+    const unit = String(r?.[2] ?? "").trim();
+    const qty = parseFloat(String(r?.[3] ?? ""));
+    const cost = parseFloat(String(r?.[4] ?? ""));
+    if (!name) continue;
+    tried++;
+    if (
+      UNIT_TOKEN.test(unit) &&
+      Number.isFinite(qty) &&
+      Number.isFinite(cost) &&
+      cost > 0 &&
+      // make sure column 0 isn't itself a header / transaction id
+      !/-\d{2}\/\d{2}\/\d{4}/.test(name) &&
+      !/^(item|ingredient|name|product|description)/i.test(name)
+    ) {
+      hits++;
+    }
+  }
+  return tried >= 3 && hits / tried > 0.5;
+}
+
 interface ParsedFile {
   id: string;
   fileName: string;
@@ -204,6 +241,17 @@ function parseWorkbook(
       if (FOOD_ONLY_SKIP.test(cat) || FOOD_ONLY_SKIP.test(rawName)) continue;
       parsed.push({ rawName, code, xlsCat: cat, rawUnit: unit, rate, supplier: "" });
     }
+  } else if (looksLikeConsumptionReport(rows)) {
+    // Headerless consumption report: [Name, Type, Unit, Qty, CostPerUnit, ...]
+    for (const r of rows) {
+      const rawName = String(r[0] ?? "").trim();
+      const rawUnit = String(r[2] ?? "").trim();
+      const rate = parseFloat(String(r[4] ?? "")) || 0;
+      if (!rawName) continue;
+      if (FOOD_ONLY_SKIP.test(rawName)) continue;
+      if (!UNIT_TOKEN.test(rawUnit)) continue; // skip any non-data rows mixed in
+      parsed.push({ rawName, code: "", xlsCat: "", rawUnit, rate, supplier: "" });
+    }
   } else {
     // generic header-based format
     let headerIdx = -1;
@@ -216,7 +264,7 @@ function parseWorkbook(
     }
     if (headerIdx === -1) {
       throw new Error(
-        "Couldn't find a header row. Include columns for Name, Category, Unit, and Cost (first row), or use the HFS Store List format.",
+        "Couldn't detect the file layout. Add a header row with columns for Name, Category, Unit, and Cost, or use an HFS Store List / Consumption Report export.",
       );
     }
     const cols = detectColumns(rows[headerIdx] as string[]);
@@ -440,8 +488,8 @@ export default function ImportIngredientsPage() {
           </p>
           <p className="text-xs text-gray-400 mb-4">
             Expected columns (any order): <code>Name · Category · Unit · Cost · Supplier</code>.
-            The HFS Store List format is detected automatically. Duplicates (by name) default to
-            <span className="font-bold"> Skip</span>.
+            HFS Store List and Consumption Report formats are detected automatically.
+            Duplicates (by name) default to <span className="font-bold">Skip</span>.
           </p>
           <input
             ref={fileInputRef}
