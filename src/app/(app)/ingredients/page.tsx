@@ -173,12 +173,24 @@ export default function IngredientsPage() {
       <PageHeader
         title="Ingredients"
         description="Master your ingredient catalog"
-        action={{
-          label: "Add Ingredient",
-          href: "/ingredients/new",
-          icon: "add",
-        }}
-      />
+      >
+        <div className="mt-4 flex gap-2">
+          <Link
+            href="/ingredients/import"
+            className="h-10 bg-white text-gray-700 text-sm font-bold rounded-xl border border-gray-200 px-4 flex items-center gap-2 hover:bg-gray-50 transition-all duration-150"
+          >
+            <span className="material-symbols-outlined text-lg">upload_file</span>
+            Import Ingredients
+          </Link>
+          <Link
+            href="/ingredients/new"
+            className="h-10 bg-gradient-to-r from-blue-700 to-blue-900 text-white text-sm font-bold rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-150 flex items-center gap-2 px-4"
+          >
+            <span className="material-symbols-outlined text-lg">add</span>
+            Add Ingredient
+          </Link>
+        </div>
+      </PageHeader>
 
       {ingredients && ingredients.length > 0 ? (
         <>
