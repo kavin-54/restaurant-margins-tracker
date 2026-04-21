@@ -20,10 +20,13 @@ export interface RecipeLine {
   notes?: string;
 }
 
+export type ServingUnit = "people" | "liter";
+
 export interface Recipe {
   id: string;
   name: string;
   servings: number;
+  servingUnit?: ServingUnit;
   costPerServing: number;
   totalRecipeCost: number;
   category: string;

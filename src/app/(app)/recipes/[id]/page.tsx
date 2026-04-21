@@ -33,6 +33,7 @@ import {
   deleteRecipeLine,
   duplicateRecipe,
   type RecipeLine,
+  type ServingUnit,
 } from "@/lib/hooks/useRecipes";
 import { useIngredients } from "@/lib/hooks/useIngredients";
 import { UNITS, getUnit, getUnitType } from "@/lib/constants/units";
@@ -108,6 +109,7 @@ export default function RecipeDetailPage() {
   const [editName, setEditName] = useState("");
   const [editCategory, setEditCategory] = useState("");
   const [editServings, setEditServings] = useState("");
+  const [editServingUnit, setEditServingUnit] = useState<ServingUnit>("people");
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [addLineOpen, setAddLineOpen] = useState(false);
@@ -127,6 +129,7 @@ export default function RecipeDetailPage() {
       setEditName(recipe.name);
       setEditCategory(recipe.category);
       setEditServings(String(recipe.servings));
+      setEditServingUnit(recipe.servingUnit ?? "people");
     }
   }, [recipe]);
 
@@ -168,6 +171,7 @@ export default function RecipeDetailPage() {
         name: editName.trim(),
         category: editCategory,
         servings: newServings,
+        servingUnit: editServingUnit,
         totalRecipeCost,
         costPerServing,
       });
@@ -370,13 +374,29 @@ export default function RecipeDetailPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Servings</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  value={editServings}
-                  onChange={(e) => setEditServings(e.target.value)}
-                />
+                <Label>{editServingUnit === "liter" ? "Yield" : "Servings"}</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min="0.01"
+                    step="any"
+                    value={editServings}
+                    onChange={(e) => setEditServings(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Select
+                    value={editServingUnit}
+                    onValueChange={(v) => setEditServingUnit(v as ServingUnit)}
+                  >
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="people">People</SelectItem>
+                      <SelectItem value="liter">Liters</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
             <div className="flex gap-2">
@@ -419,15 +439,22 @@ export default function RecipeDetailPage() {
               <h3 className="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-4">Cost Summary</h3>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500 font-medium">Servings</span>
-                  <span className="text-sm font-bold text-gray-900">{recipe.servings}</span>
+                  <span className="text-sm text-gray-500 font-medium">
+                    {recipe.servingUnit === "liter" ? "Yield" : "Servings"}
+                  </span>
+                  <span className="text-sm font-bold text-gray-900">
+                    {recipe.servings}
+                    {recipe.servingUnit === "liter" ? " L" : ""}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-500 font-medium">Total Cost</span>
                   <span className="text-sm font-bold text-blue-700">{formatCurrency(totalCost)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500 font-medium">Cost per Serving</span>
+                  <span className="text-sm text-gray-500 font-medium">
+                    {recipe.servingUnit === "liter" ? "Cost per Liter" : "Cost per Serving"}
+                  </span>
                   <span className="text-sm font-bold text-blue-700">{formatCurrency(costPerServing)}</span>
                 </div>
                 <div className="flex items-center justify-between">

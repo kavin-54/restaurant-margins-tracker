@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { addRecipe } from "@/lib/hooks/useRecipes";
+import { addRecipe, type ServingUnit } from "@/lib/hooks/useRecipes";
 
 const CATEGORIES = [
   { value: "appetizer", label: "Appetizer" },
@@ -37,6 +37,7 @@ export default function NewRecipePage() {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [servings, setServings] = useState("");
+  const [servingUnit, setServingUnit] = useState<ServingUnit>("people");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -60,6 +61,7 @@ export default function NewRecipePage() {
         name: name.trim(),
         category,
         servings: Number(servings),
+        servingUnit,
         costPerServing: 0,
         totalRecipeCost: 0,
         createdAt: new Date(),
@@ -123,17 +125,32 @@ export default function NewRecipePage() {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                      Servings <span className="text-red-500">*</span>
+                      {servingUnit === "liter" ? "Yield" : "Servings"}{" "}
+                      <span className="text-red-500">*</span>
                     </label>
-                    <Input
-                      type="number"
-                      min="1"
-                      step="1"
-                      placeholder="e.g., 10"
-                      value={servings}
-                      onChange={(e) => setServings(e.target.value)}
-                      className="bg-gray-50 border-none h-12 rounded-lg"
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        min="0.01"
+                        step="any"
+                        placeholder={servingUnit === "liter" ? "e.g., 5" : "e.g., 10"}
+                        value={servings}
+                        onChange={(e) => setServings(e.target.value)}
+                        className="bg-gray-50 border-none h-12 rounded-lg flex-1"
+                      />
+                      <Select
+                        value={servingUnit}
+                        onValueChange={(v) => setServingUnit(v as ServingUnit)}
+                      >
+                        <SelectTrigger className="bg-gray-50 border-none h-12 rounded-lg w-[120px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="people">People</SelectItem>
+                          <SelectItem value="liter">Liters</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
 

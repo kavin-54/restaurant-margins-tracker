@@ -15,7 +15,11 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { useIngredients, type Ingredient } from "@/lib/hooks/useIngredients";
-import { addRecipe, addRecipeLine } from "@/lib/hooks/useRecipes";
+import {
+  addRecipe,
+  addRecipeLine,
+  type ServingUnit,
+} from "@/lib/hooks/useRecipes";
 import { UNITS, getUnit } from "@/lib/constants/units";
 import { formatCurrency } from "@/lib/utils";
 
@@ -74,7 +78,15 @@ function parseServingsFromTitle(title: string): number | null {
   if (m) return Number(m[1]);
   const forM = title.match(/for\s+(\d+)/i);
   if (forM) return Number(forM[1]);
+  const litM = title.match(/(\d+(?:\.\d+)?)\s*(l|lit|litre|liter)s?\b/i);
+  if (litM) return Number(litM[1]);
   return null;
+}
+
+function parseServingUnitFromTitle(title: string): ServingUnit {
+  return /\b\d+(?:\.\d+)?\s*(?:l|lit|litre|liter)s?\b/i.test(title)
+    ? "liter"
+    : "people";
 }
 
 function extractRecipeName(title: string): string {
@@ -106,6 +118,7 @@ interface ParsedLine {
 interface ParsedRecipe {
   name: string;
   servings: number;
+  servingUnit: ServingUnit;
   category: string;
   lines: ParsedLine[];
 }
@@ -189,6 +202,7 @@ function parseWorkbook(
   return {
     name: extractRecipeName(title),
     servings: parseServingsFromTitle(title) ?? 10,
+    servingUnit: parseServingUnitFromTitle(title),
     category: "other",
     lines,
   };
@@ -364,6 +378,7 @@ export default function ImportRecipePage() {
         const recipe = await addRecipe({
           name: parsed.name.trim(),
           servings: parsed.servings,
+          servingUnit: parsed.servingUnit,
           category: parsed.category,
           totalRecipeCost: totalCost,
           costPerServing,
@@ -676,7 +691,8 @@ function RecipeCard({
                 {formatCurrency(preview.totalCost)}
               </p>
               <p className="text-[10px] text-gray-400">
-                {formatCurrency(preview.costPerServing)} / serving
+                {formatCurrency(preview.costPerServing)} /{" "}
+                {parsed.servingUnit === "liter" ? "liter" : "serving"}
               </p>
             </div>
           )}
@@ -727,19 +743,38 @@ function RecipeCard({
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                Servings
+                {parsed.servingUnit === "liter" ? "Yield (Liters)" : "Servings"}
               </label>
-              <Input
-                type="number"
-                min="1"
-                value={parsed.servings}
-                onChange={(e) =>
-                  onUpdateParsed({
-                    servings: Math.max(1, Number(e.target.value) || 1),
-                  })
-                }
-                disabled={item.status === "importing" || item.status === "done"}
-              />
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min="0.01"
+                  step="any"
+                  value={parsed.servings}
+                  onChange={(e) =>
+                    onUpdateParsed({
+                      servings: Math.max(0.01, Number(e.target.value) || 1),
+                    })
+                  }
+                  disabled={item.status === "importing" || item.status === "done"}
+                  className="flex-1"
+                />
+                <Select
+                  value={parsed.servingUnit}
+                  onValueChange={(v) =>
+                    onUpdateParsed({ servingUnit: v as ServingUnit })
+                  }
+                  disabled={item.status === "importing" || item.status === "done"}
+                >
+                  <SelectTrigger className="w-[110px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="people">People</SelectItem>
+                    <SelectItem value="liter">Liters</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-1.5 md:col-span-3">
               <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">

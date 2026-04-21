@@ -217,11 +217,18 @@ function RecipeCard({ recipe }: { recipe: Recipe }) {
           {/* Cost breakdown */}
           <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-100">
             <div>
-              <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Servings</p>
-              <p className="text-sm font-semibold text-gray-900 mt-0.5">{recipe.servings}</p>
+              <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">
+                {recipe.servingUnit === "liter" ? "Yield" : "Servings"}
+              </p>
+              <p className="text-sm font-semibold text-gray-900 mt-0.5">
+                {recipe.servings}
+                {recipe.servingUnit === "liter" ? " L" : ""}
+              </p>
             </div>
             <div>
-              <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Cost/Srv</p>
+              <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">
+                {recipe.servingUnit === "liter" ? "Cost/L" : "Cost/Srv"}
+              </p>
               <p className="text-sm font-bold text-blue-700 mt-0.5">
                 {formatCurrency(recipe.costPerServing)}
               </p>
