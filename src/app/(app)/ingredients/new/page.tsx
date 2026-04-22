@@ -32,19 +32,23 @@ const CATEGORIES = [
 ];
 
 const UNITS = [
-  { value: "lb", label: "lb" },
-  { value: "oz", label: "oz" },
   { value: "kg", label: "kg" },
   { value: "g", label: "g" },
-  { value: "gal", label: "gal" },
-  { value: "qt", label: "qt" },
-  { value: "pt", label: "pt" },
+  { value: "lb", label: "lb" },
+  { value: "oz", label: "oz" },
+  { value: "liter", label: "liter" },
+  { value: "ml", label: "ml" },
+  { value: "gallon", label: "gallon" },
   { value: "cup", label: "cup" },
-  { value: "fl oz", label: "fl oz" },
+  { value: "tbsp", label: "tbsp" },
+  { value: "tsp", label: "tsp" },
+  { value: "fl_oz", label: "fl oz" },
   { value: "each", label: "each" },
   { value: "dozen", label: "dozen" },
   { value: "case", label: "case" },
   { value: "bunch", label: "bunch" },
+  { value: "piece", label: "piece" },
+  { value: "head", label: "head" },
 ];
 
 const STORAGE_KEY = "hfs-new-ingredient-defaults";

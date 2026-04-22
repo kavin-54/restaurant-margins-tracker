@@ -748,12 +748,12 @@ function RecipeCard({
               <div className="flex gap-2">
                 <Input
                   type="number"
-                  min="0.01"
+                  min="0"
                   step="any"
-                  value={parsed.servings}
+                  value={parsed.servings > 0 ? parsed.servings : ""}
                   onChange={(e) =>
                     onUpdateParsed({
-                      servings: Math.max(0.01, Number(e.target.value) || 1),
+                      servings: Number(e.target.value) || 0,
                     })
                   }
                   disabled={item.status === "importing" || item.status === "done"}

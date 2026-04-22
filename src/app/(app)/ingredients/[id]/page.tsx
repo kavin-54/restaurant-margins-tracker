@@ -49,6 +49,26 @@ const CATEGORIES = [
   { value: "other", label: "Other" },
 ];
 
+const UNITS = [
+  { value: "kg", label: "kg" },
+  { value: "g", label: "g" },
+  { value: "lb", label: "lb" },
+  { value: "oz", label: "oz" },
+  { value: "liter", label: "liter" },
+  { value: "ml", label: "ml" },
+  { value: "gallon", label: "gallon" },
+  { value: "cup", label: "cup" },
+  { value: "tbsp", label: "tbsp" },
+  { value: "tsp", label: "tsp" },
+  { value: "fl_oz", label: "fl oz" },
+  { value: "each", label: "each" },
+  { value: "dozen", label: "dozen" },
+  { value: "case", label: "case" },
+  { value: "bunch", label: "bunch" },
+  { value: "piece", label: "piece" },
+  { value: "head", label: "head" },
+];
+
 const ALLERGEN_CONFIG: Record<string, { color: string; bg: string; icon: string }> = {
   nuts: { color: "text-amber-700", bg: "bg-amber-100 border-amber-200", icon: "warning" },
   "tree nuts": { color: "text-amber-700", bg: "bg-amber-100 border-amber-200", icon: "warning" },
@@ -750,11 +770,18 @@ export default function IngredientDetailPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="edit-unit">Unit</Label>
-                    <Input
-                      id="edit-unit"
-                      value={editUnit}
-                      onChange={(e) => setEditUnit(e.target.value)}
-                    />
+                    <Select value={editUnit} onValueChange={setEditUnit}>
+                      <SelectTrigger id="edit-unit">
+                        <SelectValue placeholder="Select unit" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {UNITS.map((u) => (
+                          <SelectItem key={u.value} value={u.value}>
+                            {u.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="edit-cost">Cost per Unit ($)</Label>
@@ -991,12 +1018,21 @@ export default function IngredientDetailPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="vr-unit">Unit</Label>
-                        <Input
-                          id="vr-unit"
-                          placeholder={ingredient.unit}
-                          value={vrUnit}
-                          onChange={(e) => setVrUnit(e.target.value)}
-                        />
+                        <Select
+                          value={vrUnit || ingredient.unit}
+                          onValueChange={setVrUnit}
+                        >
+                          <SelectTrigger id="vr-unit">
+                            <SelectValue placeholder="Select unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {UNITS.map((u) => (
+                              <SelectItem key={u.value} value={u.value}>
+                                {u.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="vr-total">Total Cost ($)</Label>
