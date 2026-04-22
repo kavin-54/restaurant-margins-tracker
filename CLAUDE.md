@@ -42,6 +42,10 @@ Internal catering operations platform for a Coimbatore, India-based catering com
 │   │       │   ├── import/     # Excel (.xlsx) upload → parse → preview → create recipe
 │   │       │   └── [id]/       # Detail + editable ingredient lines with per-line unit selector
 │   │       ├── ingredients/    # Ingredient CRUD + favorites + price trends
+│   │       │   ├── page.tsx    # List + "Import Ingredients" + "Add Ingredient" buttons
+│   │       │   ├── new/        # Quick Add form (dropdown unit picker)
+│   │       │   ├── import/     # Excel bulk importer (Store List / Consumption Report / generic headered)
+│   │       │   └── [id]/       # Detail with price history + vendor comparison + edit form (dropdown unit picker)
 │   │       ├── menu-planner/   # Budget-constrained menu generator (veg/non-veg + category counts)
 │   │       ├── clients/        # Client CRUD + revenue analytics + segments
 │   │       ├── vendors/        # Vendor CRUD + order history + price comparison
@@ -76,13 +80,15 @@ Internal catering operations platform for a Coimbatore, India-based catering com
 │       ├── menuPlanner.ts      # Pure generator: veg inference + branch-and-bound menu enumeration
 │       └── utils.ts            # formatCurrency (INR), formatPercent, cn()
 ├── scripts/
-│   ├── seed-coimbatore-data.mjs   # Legacy: fictional South Indian demo data
-│   ├── clear-data.mjs             # Wipe all demo collections (preserves users, systemConfig)
-│   ├── seed-hfs-ingredients.mjs   # Seed 199 real HFS ingredients from consumption report
-│   ├── fix-pack-units.mjs         # Convert PKT/BOT ingredients to real weight/volume units
-│   ├── audit-unit-mismatches.mjs  # Read-only: flag recipe lines whose unit is unknown or cross-type
-│   ├── fix-curd-line.mjs          # One-off: normalize a known cross-type curd line (historical)
-│   └── fix-grm-unit-lines.mjs     # One-off: rename recipe-line unit "grm" → "g" (historical)
+│   ├── seed-coimbatore-data.mjs           # Legacy: fictional South Indian demo data
+│   ├── clear-data.mjs                     # Wipe all demo collections (preserves users, systemConfig)
+│   ├── clear-ingredients.mjs              # Wipe only the `ingredients` collection
+│   ├── seed-hfs-ingredients.mjs           # Seed 199 real HFS ingredients from consumption report
+│   ├── seed-store-list-ingredients.mjs    # Seed unique food ingredients from "Store list.xls" (dedupe by item code)
+│   ├── fix-pack-units.mjs                 # Convert PKT/BOT ingredients to real weight/volume units
+│   ├── audit-unit-mismatches.mjs          # Read-only: flag recipe lines whose unit is unknown or cross-type
+│   ├── fix-curd-line.mjs                  # One-off: normalize a known cross-type curd line (historical)
+│   └── fix-grm-unit-lines.mjs             # One-off: rename recipe-line unit "grm" → "g" (historical)
 ├── firestore.rules             # Firestore security rules (authenticated users)
 ├── firebase.json               # Firebase project config
 ├── .firebaserc                 # Firebase project alias
@@ -103,9 +109,9 @@ Internal catering operations platform for a Coimbatore, India-based catering com
 - **Persona:** Rajesh Kumar, owner of HFS Catering in Coimbatore, Tamil Nadu
 
 ## Current Firestore Data
-**As of the latest re-seed, the database contains only ingredients** — vendors, clients, recipes, events, purchase orders, waste, and inventory were all cleared to give both logins a blank operational slate. Ingredients come from the real HFS 01/04/2026–18/04/2026 Costcenter Consumption Report (199 items across protein, produce, vegetable, dairy, spice, oil-fat, grain-starch, dry-goods, condiment, beverage, other). Packet/bottle items (e.g., `Asafoetida Powder 100g`, `Refined Oil 1L`) are normalized to `kg`/`liter` with per-unit pricing so recipes can use any universal unit. The `vegetable` category sits alongside `produce` (distinct badge color) and is surfaced in every ingredient category picker.
+**As of the latest re-seed, the database contains only ingredients** — vendors, clients, recipes, events, purchase orders, waste, and inventory were all cleared to give both logins a blank operational slate. The most recent seed came from `scripts/seed-store-list-ingredients.mjs` — it reads `~/Downloads/Store list.xls`, filters to food categories (Dairy / Frozen Foods / Grocery / Kitchen F&B / Meat & Fish — skipping Cleaning / Laundry / Office / Packaging / Gas / Guest Supply), dedupes by HFS item code keeping the most recent non-zero rate, and writes ~146 ingredients with doc IDs `hfs-<code>`. Categories are inferred from the XLS category plus keyword heuristics (e.g., `rice|atta|flour` → `grain-starch`, `banana|apple|mango` → `produce`, `cucumber|cabbage|onion` → `vegetable`, `ghee|oil` → `oil-fat`).
 
-See `scripts/seed-hfs-ingredients.mjs` for the source-of-truth list and `scripts/fix-pack-units.mjs` for the normalization rules.
+Historical alternative: `scripts/seed-hfs-ingredients.mjs` produces a hand-curated 199-item list from the 01/04/2026–18/04/2026 Consumption Report with `scripts/fix-pack-units.mjs` normalizing packet/bottle items to `kg`/`liter` with per-unit pricing.
 
 ## Legacy Demo Data (not currently seeded)
 The following describes what `scripts/seed-coimbatore-data.mjs` produces if you run it. It is NOT in Firestore unless you explicitly re-seed.
@@ -139,10 +145,14 @@ Mix of daily meals (PSG, Tidel, Amrita), factory shifts (KPR, Roots), weddings (
 # Wipe all demo collections (preserves users & systemConfig)
 node scripts/clear-data.mjs
 
-# Load the 199 real HFS ingredients from the consumption report
-node scripts/seed-hfs-ingredients.mjs
+# Wipe only the ingredients collection
+node scripts/clear-ingredients.mjs
 
-# Normalize packet/bottle items to kg/liter with per-unit pricing
+# Current default: bulk-load deduped food ingredients from ~/Downloads/Store list.xls
+node scripts/seed-store-list-ingredients.mjs
+
+# Historical alternative: hand-curated 199-item seed + packet-unit normalization
+node scripts/seed-hfs-ingredients.mjs
 node scripts/fix-pack-units.mjs
 
 # (Legacy) Re-seed fictional Coimbatore demo across all collections
@@ -179,12 +189,34 @@ The hooks in `src/lib/hooks/` define their OWN simpler interfaces (e.g., `Event`
 
 ### Key Hook Interface Fields
 - **Event:** `clientId, clientName, eventDate, eventType, guestCount, status (inquiry|proposal|confirmed|completed|cancelled), totalCost, totalPrice, marginPercentage`
-- **Recipe:** `name, servings, costPerServing, totalRecipeCost, category` + `lines` subcollection. (`description?` still exists on the TypeScript type for back-compat with legacy docs but is no longer set or displayed by any UI — the field was removed from `/recipes/new`, `/recipes/[id]` edit, and `/recipes/import` forms.)
+- **Recipe:** `name, servings, servingUnit? ("people" | "liter"), costPerServing, totalRecipeCost, category` + `lines` subcollection. `servingUnit` is optional; missing/empty is treated as `"people"` so existing recipes render unchanged. (`description?` still exists on the TypeScript type for back-compat with legacy docs but is no longer set or displayed by any UI — the field was removed from `/recipes/new`, `/recipes/[id]` edit, and `/recipes/import` forms.)
 - **Ingredient:** `name, unit, costPerUnit, supplier, category`
 - **Client:** `name, email, phone, company, address, city, state, notes`
 - **Vendor:** `name, email, phone, address, city, state, contactPerson, specialties[], leadTime, minimumOrder, notes`
 - **WasteEntry:** `ingredientId, ingredientName, quantity, unit, costPerUnit, totalCost, reason (spoilage|accident|prep-loss|other), date`
 - **InventoryItem:** `ingredientId, ingredientName, currentQuantity, unit, reorderPoint, lastRestockedAt, costPerUnit`
+
+### Recipe Yield Unit — People vs Liters (`servingUnit`)
+Recipes can be measured by head count OR by liquid yield. The field is optional on the Recipe type; `undefined` renders as "people" everywhere for back-compat.
+
+- **Where it's exposed:** `/recipes/new` (Quick Add form), `/recipes/[id]` (edit form), `/recipes/import` (per-file card). Each has a two-option dropdown next to the Servings input.
+- **Auto-detection on import:** `parseServingUnitFromTitle()` in `src/app/(app)/recipes/import/page.tsx` flips the unit to `liter` when the title contains `N L` / `liter(s)` / `litre(s)` (e.g., `Ghee 5L` → `servings=5, servingUnit=liter`).
+- **Display adaptation:** the cost-summary card, recipe-list card, and importer header all swap labels from "Servings" / "Cost per Serving" to "Yield" / "Cost per Liter" (and show `5 L` instead of `5`) when `servingUnit === "liter"`. Math is identical (totalCost / servings).
+- **Typeable servings input:** on `/recipes/import` the Servings field stores a number but the `<Input>` shows empty when 0, so select-all + type "500" works in one keystroke. Validation rejects `<= 0` only at import time.
+
+### Ingredient Excel Importer (`/ingredients/import`)
+Bulk-upload ingredients from an XLSX/XLS. Entry is the "Import Ingredients" button next to "Add Ingredient" on `/ingredients`. Mirrors the recipe importer's drop zone + per-file card + preview-then-commit flow, but one row = one ingredient and the preview is a flat editable table.
+
+- **Layout auto-detection (three branches in `parseWorkbook()`):**
+  1. **HFS Store List** (`looksLikeStoreList()`) — headerless; detects transaction-id + DD/MM/YYYY date in col 0, item code in col 1. Parses `code=col1, name=col3, category=col4, unit=col6, rate=col9`.
+  2. **HFS Consumption Report** (`looksLikeConsumptionReport()`) — headerless; detects a unit keyword in col 2 plus numeric qty/cost in cols 3-4. Parses `name=col0, unit=col2, cost=col4` (no category or code in this format — inferred).
+  3. **Generic headered** — scans the first 20 rows for one containing `Ingredient|Item Name|Name|Product`, then `detectColumns()` maps whatever headers exist (name/category/unit/cost/supplier/code, any order).
+- **Unit normalization:** `UNIT_ALIASES` handles `nos/pcs/gm/lit/pkt/bot/bun/…` → canonical units. `UNIT_TOKEN` gates the Consumption Report detector and filters rows whose unit column isn't recognized.
+- **Category inference:** `guessCategory(xlsCat, rawName)` first matches the XLS category string (e.g., `DAIRY PRODUCTS` → `dairy`, `MEAT AND FISH` → `protein`), then falls back to name keyword heuristics covering spices, grains, pulses, condiments, oils, fruits (`produce`), and vegetables (`vegetable`). Fruit/vegetable heuristics are specifically tuned to the HFS catalog (banana, pappaya, chow chow, ladies finger, etc.).
+- **Non-food filter:** `FOOD_ONLY_SKIP` drops Store List categories like CATERING SUPPLIES / CLEANING / LAUNDRY / OFFICE / GUEST SUPPLY / HLP-GAS / COST CENTRE rows during Store List parse.
+- **Dedupe within file:** keyed by `code || name.toLowerCase()`, keeping the highest non-zero rate.
+- **Existing-ingredient detection:** case-insensitive name match against the live `ingredients` collection. Duplicates get a per-row dropdown (default `Skip`, alternative `Update existing`) plus "Skip all / Update all" bulk buttons in the file header. Honors the earlier "only upload each ingredient one time" preference.
+- **Per-row editing:** Name, Category, Unit, Cost, Supplier are all editable in the preview before commit. Rows with any missing required field are caught pre-import and block the commit with a toast.
 
 ### Recipe Excel Importer (`/recipes/import`)
 Employees upload an `.xlsx` file and the page parses it client-side with `xlsx` (SheetJS), then shows a preview before writing to Firestore.
@@ -241,7 +273,9 @@ Material Design 3 / Google Stitch tokens applied globally:
 - `npm run build` — production build (run before pushing to catch errors; delete `.next/` first if you hit stale trace errors)
 - `npm run lint` — ESLint check
 - `node scripts/clear-data.mjs` — wipe demo collections (keeps users + systemConfig)
-- `node scripts/seed-hfs-ingredients.mjs` — load real HFS ingredients
+- `node scripts/clear-ingredients.mjs` — wipe only the ingredients collection
+- `node scripts/seed-store-list-ingredients.mjs` — bulk-seed from ~/Downloads/Store list.xls (current default)
+- `node scripts/seed-hfs-ingredients.mjs` — hand-curated 199-item seed
 - `node scripts/fix-pack-units.mjs` — normalize PKT/BOT items to kg/liter
 - `node scripts/audit-unit-mismatches.mjs` — read-only: list recipe lines with unknown or cross-type units
 - `node scripts/seed-coimbatore-data.mjs` — legacy fictional demo (clears + re-seeds everything)
@@ -252,7 +286,7 @@ Material Design 3 / Google Stitch tokens applied globally:
 - Format: `type(scope): description` (e.g., `feat(events): add menu builder`)
 - Types: feat, fix, docs, style, refactor, test, chore
 - Always run `npm run build` before committing to catch TypeScript errors
-- Co-author line: `Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>`
+- Co-author line: `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>`
 
 ## Known Issues / Gotchas
 - Firestore on Vercel requires `experimentalAutoDetectLongPolling` — without it, WebSocket connections fail ("client is offline")
